@@ -1,0 +1,536 @@
+import { db, auth } from './config';
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy,
+  serverTimestamp
+} from 'firebase/firestore';
+import { Lecture, Announcement, GeneralSettings, PrayerSettings, Admin } from '../types';
+
+// Check if we are running in the browser
+const isBrowser = typeof window !== 'undefined';
+
+// Check if Firebase is actually configured with real keys
+export const isFirebaseConfigured = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  
+  return !!(
+    apiKey && 
+    apiKey !== 'mock-api-key' &&
+    apiKey !== 'dummy-api-key-for-build' &&
+    projectId &&
+    projectId !== 'mock-project-id' &&
+    projectId !== 'dummy-project'
+  );
+};
+
+// Helper to wrap database promises with a 3-second timeout to prevent any offline hangs
+function withDbTimeout<T>(promise: Promise<T>, timeoutMs = 3000): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("Database operation timed out"));
+    }, timeoutMs);
+    
+    promise.then(
+      (res) => {
+        clearTimeout(timer);
+        resolve(res);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
+// Helper to extract YouTube Video ID
+export const getYouTubeId = (url: string): string => {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : '';
+};
+
+// Helper to get YouTube Thumbnail URL
+export const getYouTubeThumbnail = (url: string): string => {
+  const id = getYouTubeId(url);
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : '';
+};
+
+// --- DEFAULT SEED DATA ---
+const defaultGeneralSettings: GeneralSettings = {
+  mosqueName: "مسجد سيد المرسلين",
+  logoUrl: "/logo.png",
+  description: "الموقع الرسمي لمسجد سيد المرسلين. نسعى لتقديم الخدمات الدينية والثقافية، وإقامة شعائر الصلوات الخمس والجمعة، ونشر تعاليم الإسلام السمحة.",
+  contactPhone: "+201000000000",
+  whatsappLink: "https://wa.me/33700000000", // placeholder or real link
+  facebookLink: "https://facebook.com",
+  youtubeChannel: "https://www.youtube.com/@OfficialSydAL-Mursalin",
+  liveStreamUrl: ""
+};
+
+const defaultPrayerSettings: PrayerSettings = {
+  calculationMethod: "UmmAlQura",
+  madhab: "Shafi",
+  manualOffsets: { Fajr: 0, Shuruq: 0, Dhuhr: 0, Asr: 0, Maghrib: 0, Isha: 0 },
+  manualTimes: {
+    Fajr: "04:15",
+    Shuruq: "05:45",
+    Dhuhr: "12:30",
+    Asr: "16:00",
+    Maghrib: "19:15",
+    Isha: "20:45"
+  },
+  useManualTimes: false,
+  latitude: 30.0444, // Cairo default
+  longitude: 31.2357
+};
+
+const defaultLectures: Lecture[] = [
+  {
+    id: "lecture-1",
+    title: "خطبة الجمعة المباركة - خطبة مؤثرة وقيمة",
+    description: "تسجيل من خطب مسجد سيد المرسلين الرسمية على اليوتيوب.",
+    sheikh: "خطيب المسجد",
+    youtubeUrl: "https://youtu.be/Vs2ibIIJrSk?si=VfUCUAQMV_WjV6R3",
+    thumbnailUrl: "https://img.youtube.com/vi/Vs2ibIIJrSk/hqdefault.jpg",
+    createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000 // 3 days ago
+  },
+  {
+    id: "lecture-2",
+    title: "من خطب الجمعة المتميزة ومواعظ الإيمان",
+    description: "موعظة إيمانية هامة من الخطب الأسبوعية المباركة بالمسجد.",
+    sheikh: "خطيب المسجد",
+    youtubeUrl: "https://youtu.be/sLNkh_Ulv4g?si=x17Gm7o27MabZb4L",
+    thumbnailUrl: "https://img.youtube.com/vi/sLNkh_Ulv4g/hqdefault.jpg",
+    createdAt: Date.now() - 7 * 24 * 60 * 60 * 1000 // 7 days ago
+  },
+  {
+    id: "lecture-3",
+    title: "درس أسبوعي وخطبة مباركة حول العقيدة والسلوك",
+    description: "مادة مسجلة ومرفوعة على قناة المسجد الرسمية.",
+    sheikh: "دعاة المسجد",
+    youtubeUrl: "https://youtu.be/2vn5Gp2gsXc?si=WxOeuvxIxqlVCC-Y",
+    thumbnailUrl: "https://img.youtube.com/vi/2vn5Gp2gsXc/hqdefault.jpg",
+    createdAt: Date.now() - 12 * 24 * 60 * 60 * 1000 // 12 days ago
+  },
+  {
+    id: "lecture-4",
+    title: "تلاوة قرآنية خاشعة ومؤثرة بصوت ندي",
+    description: "تلاوة خاشعة مميزة من الصلوات الجهرية بمسجد سيد المرسلين.",
+    sheikh: "إمام المسجد",
+    youtubeUrl: "https://youtu.be/vo48qB1gSxI?si=c9xuELkHpMaAzoLj",
+    thumbnailUrl: "https://img.youtube.com/vi/vo48qB1gSxI/hqdefault.jpg",
+    createdAt: Date.now() - 15 * 24 * 60 * 60 * 1000 // 15 days ago
+  }
+];
+
+const defaultAnnouncements: Announcement[] = [
+  {
+    id: "ann-1",
+    title: "إطلاق الموقع الإلكتروني الرسمي للمسجد",
+    content: "تم بفضل الله وتوفيقه إطلاق الموقع الإلكتروني الرسمي لمسجد سيد المرسلين لمتابعة مواقيت الصلاة المحدثة والخطب الأسبوعية والإعلانات أولاً بأول.",
+    imageUrl: "",
+    createdAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
+    isActive: true
+  },
+  {
+    id: "ann-2",
+    title: "بدء التسجيل لحلقة تحفيظ القرآن الأسبوعية",
+    content: "يسر إدارة المسجد الإعلان عن حلقة تحفيظ وتجويد القرآن الكريم للأطفال والشباب، كل يوم سبت بعد صلاة العصر بمكتبة المسجد. يُرجى التنسيق مع إمام المسجد للتسجيل.",
+    imageUrl: "",
+    createdAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
+    isActive: true
+  }
+];
+
+const defaultAdmins: Admin[] = [
+  {
+    id: "am2004arnasir@gmail.com".toLowerCase(),
+    email: "am2004arnasir@gmail.com",
+    role: "super_admin",
+    createdAt: Date.now()
+  }
+];
+
+// --- MOCK STORAGE FALLBACK ---
+const mockDb = {
+  get: (key: string, defaultValue: any) => {
+    if (!isBrowser) return defaultValue;
+    const val = localStorage.getItem(`saed_${key}`);
+    return val ? JSON.parse(val) : defaultValue;
+  },
+  set: (key: string, value: any) => {
+    if (!isBrowser) return;
+    localStorage.setItem(`saed_${key}`, JSON.stringify(value));
+  }
+};
+
+// Ensure default structures are seeded in LocalStorage mock
+const ensureMockSeeded = () => {
+  if (!isBrowser) return;
+  if (!localStorage.getItem('saed_general_settings')) {
+    mockDb.set('general_settings', defaultGeneralSettings);
+  }
+  if (!localStorage.getItem('saed_prayer_settings')) {
+    mockDb.set('prayer_settings', defaultPrayerSettings);
+  }
+  if (!localStorage.getItem('saed_lectures')) {
+    mockDb.set('lectures', defaultLectures);
+  }
+  if (!localStorage.getItem('saed_announcements')) {
+    mockDb.set('announcements', defaultAnnouncements);
+  }
+  if (!localStorage.getItem('saed_admins')) {
+    mockDb.set('admins', defaultAdmins);
+  }
+};
+
+// Initialize seeding for mock mode
+ensureMockSeeded();
+
+// ==========================================
+// DB SERVICE ACTIONS (AUTO SWITCHING)
+// ==========================================
+
+// 1. GENERAL SETTINGS
+export const getGeneralSettings = async (): Promise<GeneralSettings> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'settings', 'general');
+      const docSnap = await withDbTimeout(getDoc(docRef));
+      if (docSnap.exists()) {
+        return docSnap.data() as GeneralSettings;
+      } else {
+        // Seed default settings to Firestore
+        await withDbTimeout(setDoc(docRef, defaultGeneralSettings));
+        return defaultGeneralSettings;
+      }
+    } catch (e) {
+      console.warn("Firebase failed, falling back to LocalStorage mock", e);
+    }
+  }
+  return mockDb.get('general_settings', defaultGeneralSettings);
+};
+
+export const saveGeneralSettings = async (settings: GeneralSettings): Promise<void> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'settings', 'general');
+      await withDbTimeout(setDoc(docRef, settings, { merge: true }));
+      return;
+    } catch (e) {
+      console.error("Firebase saveGeneralSettings error:", e);
+    }
+  }
+  mockDb.set('general_settings', settings);
+};
+
+// 2. PRAYER SETTINGS
+export const getPrayerSettings = async (): Promise<PrayerSettings> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'settings', 'prayer');
+      const docSnap = await withDbTimeout(getDoc(docRef));
+      if (docSnap.exists()) {
+        return docSnap.data() as PrayerSettings;
+      } else {
+        // Seed default to Firestore
+        await withDbTimeout(setDoc(docRef, defaultPrayerSettings));
+        return defaultPrayerSettings;
+      }
+    } catch (e) {
+      console.warn("Firebase failed, falling back to LocalStorage mock", e);
+    }
+  }
+  return mockDb.get('prayer_settings', defaultPrayerSettings);
+};
+
+export const savePrayerSettings = async (settings: PrayerSettings): Promise<void> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'settings', 'prayer');
+      await setDoc(docRef, settings, { merge: true });
+      return;
+    } catch (e) {
+      console.error("Firebase savePrayerSettings error:", e);
+    }
+  }
+  mockDb.set('prayer_settings', settings);
+};
+
+// 3. ANNOUNCEMENTS
+export const getAnnouncements = async (onlyActive = false): Promise<Announcement[]> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const collRef = collection(db, 'announcements');
+      let q = query(collRef, orderBy('createdAt', 'desc'));
+      if (onlyActive) {
+        q = query(collRef, where('isActive', '==', true), orderBy('createdAt', 'desc'));
+      }
+      const querySnap = await withDbTimeout(getDocs(q));
+      const list: Announcement[] = [];
+      querySnap.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() } as Announcement);
+      });
+      if (list.length > 0) return list;
+    } catch (e) {
+      console.warn("Firebase failed, falling back to LocalStorage mock", e);
+    }
+  }
+  
+  const all: Announcement[] = mockDb.get('announcements', defaultAnnouncements);
+  // Sort descending by date
+  const sorted = all.sort((a, b) => b.createdAt - a.createdAt);
+  return onlyActive ? sorted.filter(a => a.isActive) : sorted;
+};
+
+export const addAnnouncement = async (ann: Omit<Announcement, 'id'>): Promise<string> => {
+  const newId = `ann-${Date.now()}`;
+  const fullAnn: Announcement = { ...ann, id: newId };
+  
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = await withDbTimeout(addDoc(collection(db, 'announcements'), ann));
+      return docRef.id;
+    } catch (e) {
+      console.error("Firebase addAnnouncement error:", e);
+    }
+  }
+  
+  const current: Announcement[] = mockDb.get('announcements', defaultAnnouncements);
+  current.push(fullAnn);
+  mockDb.set('announcements', current);
+  return newId;
+};
+
+export const updateAnnouncement = async (id: string, updates: Partial<Announcement>): Promise<void> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'announcements', id);
+      await withDbTimeout(updateDoc(docRef, updates));
+      return;
+    } catch (e) {
+      console.error("Firebase updateAnnouncement error:", e);
+    }
+  }
+  
+  const current: Announcement[] = mockDb.get('announcements', defaultAnnouncements);
+  const updated = current.map(item => item.id === id ? { ...item, ...updates } : item);
+  mockDb.set('announcements', updated);
+};
+
+export const deleteAnnouncement = async (id: string): Promise<void> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'announcements', id);
+      await withDbTimeout(deleteDoc(docRef));
+      return;
+    } catch (e) {
+      console.error("Firebase deleteAnnouncement error:", e);
+    }
+  }
+  
+  const current: Announcement[] = mockDb.get('announcements', defaultAnnouncements);
+  const filtered = current.filter(item => item.id !== id);
+  mockDb.set('announcements', filtered);
+};
+
+// 4. LECTURES
+export const getLectures = async (): Promise<Lecture[]> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const collRef = collection(db, 'lectures');
+      const q = query(collRef, orderBy('createdAt', 'desc'));
+      const querySnap = await withDbTimeout(getDocs(q));
+      const list: Lecture[] = [];
+      querySnap.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() } as Lecture);
+      });
+      if (list.length > 0) return list;
+    } catch (e) {
+      console.warn("Firebase failed, falling back to LocalStorage mock", e);
+    }
+  }
+  
+  const all: Lecture[] = mockDb.get('lectures', defaultLectures);
+  return all.sort((a, b) => b.createdAt - a.createdAt);
+};
+
+export const addLecture = async (lec: Omit<Lecture, 'id'>): Promise<string> => {
+  const newId = `lec-${Date.now()}`;
+  const completeLec: Lecture = {
+    ...lec,
+    id: newId,
+    thumbnailUrl: lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl)
+  };
+  
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = await withDbTimeout(addDoc(collection(db, 'lectures'), {
+        ...lec,
+        thumbnailUrl: lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl)
+      }));
+      return docRef.id;
+    } catch (e) {
+      console.error("Firebase addLecture error:", e);
+    }
+  }
+  
+  const current: Lecture[] = mockDb.get('lectures', defaultLectures);
+  current.push(completeLec);
+  mockDb.set('lectures', current);
+  return newId;
+};
+
+export const updateLecture = async (id: string, updates: Partial<Lecture>): Promise<void> => {
+  const cleanUpdates = { ...updates };
+  if (updates.youtubeUrl && !updates.thumbnailUrl) {
+    cleanUpdates.thumbnailUrl = getYouTubeThumbnail(updates.youtubeUrl);
+  }
+  
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'lectures', id);
+      await withDbTimeout(updateDoc(docRef, cleanUpdates));
+      return;
+    } catch (e) {
+      console.error("Firebase updateLecture error:", e);
+    }
+  }
+  
+  const current: Lecture[] = mockDb.get('lectures', defaultLectures);
+  const updated = current.map(item => item.id === id ? { ...item, ...cleanUpdates } : item);
+  mockDb.set('lectures', updated);
+};
+
+export const deleteLecture = async (id: string): Promise<void> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'lectures', id);
+      await withDbTimeout(deleteDoc(docRef));
+      return;
+    } catch (e) {
+      console.error("Firebase deleteLecture error:", e);
+    }
+  }
+  
+  const current: Lecture[] = mockDb.get('lectures', defaultLectures);
+  const filtered = current.filter(item => item.id !== id);
+  mockDb.set('lectures', filtered);
+};
+
+// 5. ADMINS
+export const checkAdminEmail = async (email: string): Promise<Admin | null> => {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase is not configured. Please set your credentials in .env.local.");
+  }
+  
+  const docRef = doc(db, 'admins', cleanEmail);
+  const docSnap = await withDbTimeout(getDoc(docRef));
+  if (docSnap.exists()) {
+    return docSnap.data() as Admin;
+  } else {
+    // If it's the default super admin, let's auto-seed it to Firestore!
+    if (cleanEmail === 'am2004arnasir@gmail.com') {
+      const superAdmin = {
+        id: cleanEmail,
+        email: 'am2004arnasir@gmail.com',
+        role: 'super_admin',
+        createdAt: serverTimestamp()
+      };
+      await withDbTimeout(setDoc(docRef, superAdmin));
+      // Return with locally mocked createdAt since Firestore will resolve serverTimestamp async on subsequent fetches
+      return {
+        id: cleanEmail,
+        email: 'am2004arnasir@gmail.com',
+        role: 'super_admin',
+        createdAt: Date.now()
+      } as Admin;
+    }
+    return null;
+  }
+};
+
+export const getAdmins = async (): Promise<Admin[]> => {
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase is not configured. Please set your credentials in .env.local.");
+  }
+  
+  const collRef = collection(db, 'admins');
+  const querySnap = await withDbTimeout(getDocs(collRef));
+  const list: Admin[] = [];
+  querySnap.forEach((doc) => {
+    list.push({ id: doc.id, ...doc.data() } as Admin);
+  });
+  // Ensure the default admin exists in the list if the list is empty
+  if (list.length === 0) {
+    const cleanEmail = 'am2004arnasir@gmail.com';
+    const superAdmin = {
+      id: cleanEmail,
+      email: 'am2004arnasir@gmail.com',
+      role: 'super_admin',
+      createdAt: serverTimestamp()
+    };
+    await withDbTimeout(setDoc(doc(db, 'admins', cleanEmail), superAdmin));
+    list.push({
+      id: cleanEmail,
+      email: 'am2004arnasir@gmail.com',
+      role: 'super_admin',
+      createdAt: Date.now()
+    } as Admin);
+  }
+  return list;
+};
+
+export const addAdmin = async (email: string, role: 'super_admin' | 'admin'): Promise<void> => {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase is not configured. Please set your credentials in .env.local.");
+  }
+  
+  const docRef = doc(db, 'admins', cleanEmail);
+  const docSnap = await withDbTimeout(getDoc(docRef));
+  if (docSnap.exists()) {
+    throw new Error("هذا المشرف مسجل بالفعل.");
+  }
+  
+  const newAdmin = {
+    id: cleanEmail,
+    email: email.trim(),
+    role,
+    createdAt: serverTimestamp()
+  };
+  await withDbTimeout(setDoc(docRef, newAdmin));
+};
+
+export const deleteAdmin = async (email: string): Promise<void> => {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase is not configured. Please set your credentials in .env.local.");
+  }
+  
+  // Check if we are deleting the last super admin
+  const all = await getAdmins();
+  const superAdmins = all.filter(a => a.role === 'super_admin');
+  const deletingAdmin = all.find(a => a.id === cleanEmail);
+  
+  if (deletingAdmin?.role === 'super_admin' && superAdmins.length <= 1) {
+    throw new Error("لا يمكن حذف المشرف المالك (Super Admin) الأخير.");
+  }
+  
+  const docRef = doc(db, 'admins', cleanEmail);
+  await withDbTimeout(deleteDoc(docRef));
+};

@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to verify user's email exists in the admins collection
+    // We lowercase the authenticated email to perform case-insensitive checking since document IDs are lowercased
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()));
+    }
+
+    // Default catch-all rules
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Explicit security rules for the admins collection
+    match /admins/{adminEmail} {
+      allow read: if true;
+      // Writing (creating/updating/deleting) admins is allowed if the caller is an authenticated administrator
+      allow write: if isAdmin();
+    }
+
+    // Settings rules
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Announcements rules
+    match /announcements/{annId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Lectures rules
+    match /lectures/{lectureId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
