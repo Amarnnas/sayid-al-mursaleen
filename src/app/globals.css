@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #fafaf9;
@@ -49,6 +50,19 @@
     --gold-hover: #fcd34d;
     --gold-glow: rgba(251, 191, 36, 0.25);
   }
+}
+
+.dark {
+  --background: #0c0a09;
+  --foreground: #f5f5f4;
+  
+  --emerald-primary: #10b981;
+  --emerald-hover: #34d399;
+  --emerald-glow: rgba(16, 185, 129, 0.25);
+  
+  --gold-primary: #fbbf24;
+  --gold-hover: #fcd34d;
+  --gold-glow: rgba(251, 191, 36, 0.25);
 }
 
 body {

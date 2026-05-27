@@ -13,6 +13,7 @@ import PrayerTimesCard from '../components/PrayerTimesCard';
 import AnnouncementCard from '../components/AnnouncementCard';
 import LectureCard from '../components/LectureCard';
 import AccessibilityWidget from '../components/AccessibilityWidget';
+import ThemeToggle from '../components/ThemeToggle';
 import { 
   Phone, 
   Radio, 
@@ -294,6 +295,8 @@ function HomeContent() {
                 <span>البث المباشر</span>
               </a>
             )}
+
+            <ThemeToggle />
 
             <Link 
               href="/admin"

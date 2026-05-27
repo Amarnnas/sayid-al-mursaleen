@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   getLectures, 
+  getLectureBySlugOrId,
   getCategories, 
   incrementLectureViews, 
   incrementLectureDownloads, 
@@ -27,6 +28,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import AccessibilityWidget from '../../../components/AccessibilityWidget';
+import ThemeToggle from '../../../components/ThemeToggle';
 
 export default function LectureWatchPage() {
   const { slug } = useParams() as { slug: string };
@@ -43,27 +45,42 @@ export default function LectureWatchPage() {
   useEffect(() => {
     const loadPageData = async () => {
       try {
-        const gen = await getGeneralSettings();
-        const pray = await getPrayerSettings();
-        const cats = await getCategories();
-        const allLectures = await getLectures();
+        const slugStr = Array.isArray(slug) ? slug[0] : slug;
+        const decodedSlug = decodeURIComponent(slugStr || '');
 
-        setGeneralSettings(gen);
-        setPrayerSettings(pray);
-        setCategories(cats);
-
-        // Find lecture by slug or by id
-        const currentLecture = allLectures.find(
-          (l) => l.slug === slug || l.id === slug
-        );
+        // 1. Fetch main lecture first (critical path)
+        const currentLecture = await getLectureBySlugOrId(decodedSlug);
 
         if (!currentLecture) {
           setError('المحاضرة المطلوبة غير موجودة.');
+          // Attempt to load settings even on failure to render outer layout
+          try {
+            const gen = await getGeneralSettings();
+            const pray = await getPrayerSettings();
+            const cats = await getCategories();
+            setGeneralSettings(gen);
+            setPrayerSettings(pray);
+            setCategories(cats);
+          } catch (layoutErr) {
+            console.error("Error loading layout settings on error state:", layoutErr);
+          }
           setLoading(false);
           return;
         }
 
         setLecture(currentLecture);
+
+        // 2. Fetch other settings in parallel to be super fast
+        const [gen, pray, cats, allLectures] = await Promise.all([
+          getGeneralSettings().catch(() => null),
+          getPrayerSettings().catch(() => null),
+          getCategories().catch(() => []),
+          getLectures().catch(() => [])
+        ]);
+
+        if (gen) setGeneralSettings(gen);
+        if (pray) setPrayerSettings(pray);
+        setCategories(cats);
 
         // Views count increment logic (once per 24 hours per lecture)
         const viewedStorageKey = `saed_viewed_${currentLecture.id}`;
@@ -137,28 +154,19 @@ export default function LectureWatchPage() {
     );
   }
 
-  if (error || !lecture) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
-        <div className="flex flex-col items-center gap-4 text-center max-w-md bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-lg">
-          <AlertCircle className="w-12 h-12 text-red-500" />
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-white">عذراً، حدث خطأ</h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">{error || 'لم نتمكن من العثور على المحاضرة المطلوبة.'}</p>
-          <button 
-            onClick={() => router.push('/')}
-            className="mt-4 flex items-center gap-2 bg-emerald-600 text-white font-bold text-sm px-6 py-2.5 rounded-2xl hover:bg-emerald-700 transition-colors"
-          >
-            <ArrowRight className="w-4 h-4" />
-            <span>العودة للرئيسية</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const videoId = getYouTubeId(lecture.youtubeUrl);
-  const gen = generalSettings!;
-  const pray = prayerSettings!;
+  const videoId = lecture ? getYouTubeId(lecture.youtubeUrl) : '';
+  const gen = generalSettings || {
+    mosqueName: "مسجد سيد المرسلين",
+    logoUrl: "/logo.png",
+    description: "",
+    contactPhone: "",
+    whatsappLink: "",
+    facebookLink: "",
+    youtubeChannel: "",
+    liveStreamUrl: "",
+    tiktokLink: ""
+  };
+  const pray = prayerSettings;
 
   // Format date elegantly in Arabic
   const formatDate = (timestamp: number) => {
@@ -209,6 +217,8 @@ export default function LectureWatchPage() {
               </a>
             )}
 
+            <ThemeToggle />
+
             <Link 
               href="/"
               className="flex items-center gap-1.5 border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-300 text-xs font-semibold px-4 py-2 rounded-xl transition-all"
@@ -223,97 +233,115 @@ export default function LectureWatchPage() {
       {/* Main Container */}
       <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-10 md:px-6 flex-1 flex flex-col lg:flex-row gap-8">
         
-        {/* Left Side: Video Player & Details */}
-        <div className="flex-1 flex flex-col gap-6">
-          
-          {/* Cinema Player Container */}
-          <div className="relative aspect-video w-full overflow-hidden rounded-3xl bg-black shadow-xl border border-zinc-200/20 dark:border-zinc-800/40">
-            {videoId ? (
-              <iframe
-                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
-                title={lecture.title}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                className="absolute inset-0 h-full w-full"
-              ></iframe>
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-zinc-500">
-                <AlertCircle className="w-12 h-12 mb-2" />
-                <span>رابط الفيديو غير صالح.</span>
-              </div>
-            )}
+        {error || !lecture ? (
+          /* Centered Error Box inside main layout */
+          <div className="flex-1 flex flex-col items-center justify-center py-12 px-4">
+            <div className="flex flex-col items-center gap-4 text-center w-full max-w-md bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-lg animate-fade-in">
+              <AlertCircle className="w-12 h-12 text-red-500" />
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">عذراً، حدث خطأ</h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">{error || 'لم نتمكن من العثور على المحاضرة المطلوبة.'}</p>
+              <button 
+                onClick={() => router.push('/')}
+                className="mt-4 flex items-center gap-2 bg-emerald-600 text-white font-bold text-sm px-6 py-2.5 rounded-2xl hover:bg-emerald-700 transition-colors"
+              >
+                <ArrowRight className="w-4 h-4" />
+                <span>العودة للرئيسية</span>
+              </button>
+            </div>
           </div>
-
-          {/* Lecture Meta Details Card */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
+        ) : (
+          /* Left Side: Video Player & Details */
+          <div className="flex-1 flex flex-col gap-6">
             
-            {/* Title & Sheikh */}
-            <div>
-              <h2 className="text-xl md:text-2xl font-black text-zinc-900 dark:text-white leading-snug">
-                {lecture.title}
-              </h2>
+            {/* Cinema Player Container */}
+            <div className="relative aspect-video w-full overflow-hidden rounded-3xl bg-black shadow-xl border border-zinc-200/20 dark:border-zinc-800/40">
+              {videoId ? (
+                <iframe
+                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
+                  title={lecture.title}
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="absolute inset-0 h-full w-full"
+                ></iframe>
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-zinc-500">
+                  <AlertCircle className="w-12 h-12 mb-2" />
+                  <span>رابط الفيديو غير صالح.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Lecture Meta Details Card */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
               
-              <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-                <span className="flex items-center gap-1.5">
-                  <User className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
-                  <span className="font-bold text-zinc-700 dark:text-zinc-300">{lecture.sheikh}</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
-                  <span>{formatDate(lecture.createdAt)}</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Eye className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
-                  <span>{lecture.views || 0} مشاهدة</span>
-                </span>
+              {/* Title & Sheikh */}
+              <div>
+                <h2 className="text-xl md:text-2xl font-black text-zinc-900 dark:text-white leading-snug">
+                  {lecture.title}
+                </h2>
+                
+                <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
+                    <span className="font-bold text-zinc-700 dark:text-zinc-300">{lecture.sheikh}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
+                    <span>{formatDate(lecture.createdAt)}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Eye className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
+                    <span>{lecture.views || 0} مشاهدة</span>
+                  </span>
+                </div>
               </div>
+
+              {/* Categories */}
+              {lecture.categoryIds && lecture.categoryIds.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                  {lecture.categoryIds.map(cId => {
+                    const cat = categories.find(c => c.id === cId);
+                    return cat ? (
+                      <span key={cId} className="text-xs bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 px-3 py-1 rounded-full font-bold">
+                        {cat.name}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
+
+              {/* Description */}
+              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/60">
+                <h4 className="font-bold text-sm text-zinc-800 dark:text-zinc-200 mb-2">الوصف والملخص:</h4>
+                <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap">
+                  {lecture.description || 'لا يوجد وصف متاح لهذه المحاضرة.'}
+                </p>
+              </div>
+
+              {/* Large MP3 Download Button */}
+              {lecture.mp3Url && (
+                <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/60 mt-2">
+                  <button
+                    onClick={handleDownloadMp3}
+                    disabled={downloading}
+                    className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg hover:shadow-emerald-600/20 active:scale-99 transition-all cursor-pointer text-base md:text-lg"
+                  >
+                    {downloading ? (
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <Music className="w-5.5 h-5.5" />
+                    )}
+                    <span>تحميل الصوت MP3</span>
+                    <span className="text-xs font-normal opacity-85">({lecture.downloads || 0} تحميل)</span>
+                  </button>
+                </div>
+              )}
+
             </div>
-
-            {/* Categories */}
-            {lecture.categoryIds && lecture.categoryIds.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
-                {lecture.categoryIds.map(cId => {
-                  const cat = categories.find(c => c.id === cId);
-                  return cat ? (
-                    <span key={cId} className="text-xs bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 px-3 py-1 rounded-full font-bold">
-                      {cat.name}
-                    </span>
-                  ) : null;
-                })}
-              </div>
-            )}
-
-            {/* Description */}
-            <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/60">
-              <h4 className="font-bold text-sm text-zinc-800 dark:text-zinc-200 mb-2">الوصف والملخص:</h4>
-              <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap">
-                {lecture.description || 'لا يوجد وصف متاح لهذه المحاضرة.'}
-              </p>
-            </div>
-
-            {/* Large MP3 Download Button */}
-            {lecture.mp3Url && (
-              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/60 mt-2">
-                <button
-                  onClick={handleDownloadMp3}
-                  disabled={downloading}
-                  className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg hover:shadow-emerald-600/20 active:scale-99 transition-all cursor-pointer text-base md:text-lg"
-                >
-                  {downloading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <Music className="w-5.5 h-5.5" />
-                  )}
-                  <span>تحميل الصوت MP3</span>
-                  <span className="text-xs font-normal opacity-85">({lecture.downloads || 0} تحميل)</span>
-                </button>
-              </div>
-            )}
 
           </div>
-
-        </div>
+        )}
 
         {/* Right Side: Suggested Lectures */}
         <div className="w-full lg:w-80 shrink-0 flex flex-col gap-5">

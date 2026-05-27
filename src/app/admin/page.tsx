@@ -32,6 +32,8 @@ import { GeneralSettings, PrayerSettings, Announcement, Lecture, Admin, Category
 import { auth } from '../../lib/firebase/config';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import Toast from '../../components/Toast';
+import AccessibilityWidget from '../../components/AccessibilityWidget';
+import ThemeToggle from '../../components/ThemeToggle';
 import { 
   Settings, 
   Clock, 
@@ -55,7 +57,8 @@ import {
   Timer,
   Tags,
   Pencil,
-  X
+  X,
+  Key
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -140,6 +143,15 @@ export default function AdminDashboard() {
   const [editingCategorySlug, setEditingCategorySlug] = useState('');
   const [editingAdminEmail, setEditingAdminEmail] = useState<string | null>(null);
   const [editingAdminPassword, setEditingAdminPassword] = useState('');
+
+  // --- Own Password Change Modal States ---
+  const [isChangingPasswordModalOpen, setIsChangingPasswordModalOpen] = useState(false);
+  const [myNewPassword, setMyNewPassword] = useState('');
+  const [myConfirmPassword, setMyConfirmPassword] = useState('');
+  const [myPasswordError, setMyPasswordError] = useState('');
+  const [myPasswordSuccess, setMyPasswordSuccess] = useState('');
+  const [isSavingMyPassword, setIsSavingMyPassword] = useState(false);
+
 
   // --- Notification Banner States ---
   const [successMsg, setSuccessMsg] = useState('');
@@ -475,6 +487,52 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
+
+  // Save logged-in admin's own password
+  const handleSaveMyPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMyPasswordError('');
+    setMyPasswordSuccess('');
+
+    const newPass = myNewPassword.trim();
+    const confPass = myConfirmPassword.trim();
+
+    if (!newPass) {
+      setMyPasswordError("يرجى إدخال كلمة المرور الجديدة.");
+      return;
+    }
+    if (newPass.length < 6) {
+      setMyPasswordError("يجب أن تكون كلمة المرور من 6 خانات على الأقل.");
+      return;
+    }
+    if (newPass !== confPass) {
+      setMyPasswordError("كلمتا المرور غير متطابقتين.");
+      return;
+    }
+
+    setIsSavingMyPassword(true);
+    try {
+      await updateAdminPassword(currentAdminEmail, newPass);
+      setMyPasswordSuccess("تم تغيير كلمة المرور الخاصة بك بنجاح!");
+      setMyNewPassword('');
+      setMyConfirmPassword('');
+      // Reload admins to sync view
+      const updated = await getAdmins();
+      setAdmins(updated);
+      
+      // Auto close modal after 2 seconds
+      setTimeout(() => {
+        setIsChangingPasswordModalOpen(false);
+        setMyPasswordSuccess('');
+      }, 2000);
+    } catch (err: any) {
+      console.error(err);
+      setMyPasswordError(err.message || "حدث خطأ أثناء تعديل كلمة المرور الخاصة بك.");
+    } finally {
+      setIsSavingMyPassword(false);
+    }
+  };
+
 
   // Delete admin
   const handleDeleteAdmin = async (email: string) => {
@@ -990,6 +1048,36 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Logged-in Admin Profile Section */}
+        {currentAdminEmail && (
+          <div className="p-4 mx-4 my-3 bg-zinc-950/40 border border-zinc-800/80 rounded-2xl flex flex-col gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center text-emerald-400 font-bold shrink-0 shadow-inner">
+                {currentAdminEmail.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-zinc-200 truncate" title={currentAdminEmail}>
+                  {currentAdminEmail}
+                </p>
+                <span className={`inline-block text-[9px] font-black px-2 py-0.5 rounded-full mt-0.5 ${
+                  currentAdminRole === 'super_admin' 
+                    ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                }`}>
+                  {currentAdminRole === 'super_admin' ? 'مشرف عام' : 'مشرف'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsChangingPasswordModalOpen(true)}
+              className="w-full flex items-center justify-center gap-1.5 bg-zinc-800 hover:bg-zinc-700/80 text-zinc-300 text-[10px] font-bold py-2 rounded-xl transition-all cursor-pointer shadow-sm"
+            >
+              <Key className="w-3.5 h-3.5 text-emerald-500" />
+              <span>تغيير كلمة المرور الخاصة بي</span>
+            </button>
+          </div>
+        )}
+
         {/* Tab Switchers */}
         <nav className="flex-1 p-4 flex flex-col gap-1.5">
           <button 
@@ -1086,7 +1174,19 @@ export default function AdminDashboard() {
       </aside>
 
       {/* 3. Main Dashboard Work Area */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-5xl mx-auto w-full">
+      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-5xl mx-auto w-full flex flex-col gap-6">
+        
+        {/* Top Control Bar with Theme Toggle */}
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-200/50 dark:border-zinc-800/50 shrink-0">
+          <div>
+            <h2 className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">لوحة الإشراف والمتابعة</h2>
+            <h1 className="text-xl md:text-2xl font-black text-zinc-900 dark:text-white mt-0.5">لوحة التحكم والتهيئة</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+          </div>
+        </div>
+
         
         {/* Tab 1: General Settings */}
         {activeTab === 'general' && (
@@ -2041,6 +2141,120 @@ export default function AdminDashboard() {
         )}
 
       </main>
+
+      {/* 4. Change Password Modal (For Logged-in Admin) */}
+      {isChangingPasswordModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in font-sans"
+          onClick={() => {
+            setIsChangingPasswordModalOpen(false);
+            setMyNewPassword('');
+            setMyConfirmPassword('');
+            setMyPasswordError('');
+            setMyPasswordSuccess('');
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/80 rounded-3xl p-6 shadow-2xl w-full max-w-md flex flex-col gap-4 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => {
+                setIsChangingPasswordModalOpen(false);
+                setMyNewPassword('');
+                setMyConfirmPassword('');
+                setMyPasswordError('');
+                setMyPasswordSuccess('');
+              }}
+              className="absolute top-4 left-4 p-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="w-8 h-8 rounded-lg bg-emerald-600/10 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                <Key className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-zinc-900 dark:text-white leading-snug">تغيير كلمة المرور الخاصة بي</h3>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">تغيير كلمة مرور المشرف الحالي: {currentAdminEmail}</p>
+              </div>
+            </div>
+
+            {myPasswordError && (
+              <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl p-3 flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-bold">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{myPasswordError}</span>
+              </div>
+            )}
+
+            {myPasswordSuccess && (
+              <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 rounded-xl p-3 flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{myPasswordSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveMyPassword} className="flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-1.5">كلمة المرور الجديدة</label>
+                <input 
+                  type="password"
+                  value={myNewPassword}
+                  onChange={(e) => setMyNewPassword(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none"
+                  placeholder="أدخل 6 أحرف/أرقام على الأقل"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-1.5">تأكيد كلمة المرور الجديدة</label>
+                <input 
+                  type="password"
+                  value={myConfirmPassword}
+                  onChange={(e) => setMyConfirmPassword(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none"
+                  placeholder="أعد إدخال كلمة المرور لتأكيدها"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-2.5 mt-2 border-t border-zinc-100 dark:border-zinc-800 pt-3">
+                <button
+                  type="submit"
+                  disabled={isSavingMyPassword}
+                  className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer shadow-lg hover:shadow-emerald-600/10 disabled:opacity-50"
+                >
+                  {isSavingMyPassword ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  <span>حفظ كلمة المرور الجديدة</span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsChangingPasswordModalOpen(false);
+                    setMyNewPassword('');
+                    setMyConfirmPassword('');
+                    setMyPasswordError('');
+                    setMyPasswordSuccess('');
+                  }}
+                  className="bg-zinc-150 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 font-bold text-xs px-5 py-2.5 rounded-xl transition-all cursor-pointer"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Accessibility Widget */}
+      <AccessibilityWidget />
 
     </div>
   );

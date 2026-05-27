@@ -36,8 +36,8 @@ export const isFirebaseConfigured = (): boolean => {
   );
 };
 
-// Helper to wrap database promises with a 3-second timeout to prevent any offline hangs
-function withDbTimeout<T>(promise: Promise<T>, timeoutMs = 3000): Promise<T> {
+// Helper to wrap database promises with a 15-second timeout to prevent any offline hangs
+function withDbTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error("Database operation timed out"));
@@ -412,6 +412,67 @@ export const getLectures = async (): Promise<Lecture[]> => {
   const all: Lecture[] = mockDb.get('lectures', defaultLectures);
   return all.sort((a, b) => b.createdAt - a.createdAt);
 };
+
+export const getLectureBySlugOrId = async (slugOrId: string): Promise<Lecture | null> => {
+  const decoded = decodeURIComponent(slugOrId || '').trim();
+  const raw = (slugOrId || '').trim();
+  
+  if (isFirebaseConfigured()) {
+    try {
+      // 1. Try fetching by Document ID first (if it looks like a valid Firestore ID or prefixed mock ID)
+      if (raw.startsWith('lec-') || raw.length > 15) {
+        const docRef = doc(db, 'lectures', raw);
+        const docSnap = await withDbTimeout(getDoc(docRef), 10000);
+        if (docSnap.exists()) {
+          return { id: docSnap.id, ...docSnap.data() } as Lecture;
+        }
+      }
+      
+      // 2. Try querying by slug or id using a simple query or collection fetch
+      const collRef = collection(db, 'lectures');
+      const querySnap = await withDbTimeout(getDocs(collRef), 10000);
+      
+      let found: Lecture | null = null;
+      querySnap.forEach((doc) => {
+        const data = doc.data() as Lecture;
+        const lId = doc.id;
+        const lSlug = data.slug || '';
+        
+        if (
+          lId === raw || 
+          lId === decoded ||
+          lSlug === raw || 
+          lSlug === decoded ||
+          decodeURIComponent(lSlug) === decoded ||
+          lSlug.toLowerCase() === decoded.toLowerCase()
+        ) {
+          found = { ...data, id: lId };
+        }
+      });
+      
+      if (found) return found;
+    } catch (e) {
+      console.error("Firebase getLectureBySlugOrId error, falling back to mock", e);
+    }
+  }
+  
+  // LocalStorage / Mock fallback
+  const all: Lecture[] = mockDb.get('lectures', defaultLectures);
+  const found = all.find(l => {
+    const lSlug = l.slug || '';
+    const lId = l.id || '';
+    return (
+      lId === raw || 
+      lId === decoded ||
+      lSlug === raw || 
+      lSlug === decoded ||
+      decodeURIComponent(lSlug) === decoded ||
+      lSlug.toLowerCase() === decoded.toLowerCase()
+    );
+  });
+  return found || null;
+};
+
 
 export const isLectureDuplicate = async (youtubeUrl: string, excludeId?: string): Promise<boolean> => {
   const videoId = getYouTubeId(youtubeUrl);
