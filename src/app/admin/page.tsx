@@ -204,26 +204,58 @@ export default function AdminDashboard() {
 
     const fetchAllData = async () => {
       setLoading(true);
+      
+      // Fetch general settings (has internal mock fallback)
       try {
         const genData = await getGeneralSettings();
-        const prayData = await getPrayerSettings();
-        const annData = await getAnnouncements(false); // get both active and inactive
-        const lecData = await getLectures();
-        const admData = await getAdmins();
-        const catData = await getCategories();
-
         setGeneral(genData);
-        setPrayer(prayData);
-        setAnnouncements(annData);
-        setLectures(lecData);
-        setAdmins(admData);
-        setCategories(catData);
       } catch (e) {
-        console.error("Failed fetching admin data:", e);
-        setErrorMsg("حدث خطأ أثناء تحميل بيانات المسجد.");
-      } finally {
-        setLoading(false);
+        console.error("Failed fetching general settings:", e);
+        setErrorMsg("حدث خطأ أثناء تحميل الإعدادات العامة.");
       }
+
+      // Fetch prayer settings (has internal mock fallback)
+      try {
+        const prayData = await getPrayerSettings();
+        setPrayer(prayData);
+      } catch (e) {
+        console.error("Failed fetching prayer settings:", e);
+        setErrorMsg("حدث خطأ أثناء تحميل مواقيت الصلاة.");
+      }
+
+      // Fetch announcements
+      try {
+        const annData = await getAnnouncements(false);
+        setAnnouncements(annData || []);
+      } catch (e) {
+        console.error("Failed fetching announcements:", e);
+      }
+
+      // Fetch lectures
+      try {
+        const lecData = await getLectures();
+        setLectures(lecData || []);
+      } catch (e) {
+        console.error("Failed fetching lectures:", e);
+      }
+
+      // Fetch admins
+      try {
+        const admData = await getAdmins();
+        setAdmins(admData || []);
+      } catch (e) {
+        console.error("Failed fetching admins:", e);
+      }
+
+      // Fetch categories
+      try {
+        const catData = await getCategories();
+        setCategories(catData || []);
+      } catch (e) {
+        console.error("Failed fetching categories:", e);
+      }
+
+      setLoading(false);
     };
 
     fetchAllData();
@@ -428,14 +460,20 @@ export default function AdminDashboard() {
 
   // Delete admin
   const handleDeleteAdmin = async (email: string) => {
-    if (email.toLowerCase() === currentAdminEmail.toLowerCase()) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const activeEmail = (currentAdminEmail || '').trim().toLowerCase();
+    if (!cleanEmail) {
+      setErrorMsg("البريد الإلكتروني غير صالح.");
+      return;
+    }
+    if (cleanEmail === activeEmail) {
       setErrorMsg("لا يمكنك حذف حسابك النشط الذي تسجل به الدخول حالياً.");
       return;
     }
-    if (!window.confirm(`هل أنت متأكد من حذف المشرف (${email}) نهائياً؟`)) return;
+    if (!window.confirm(`هل أنت متأكد من حذف المشرف (${cleanEmail}) نهائياً؟`)) return;
     setLoading(true);
     try {
-      await deleteAdmin(email);
+      await deleteAdmin(cleanEmail);
       setSuccessMsg("تم حذف المشرف بنجاح.");
       // Reload admins
       const updated = await getAdmins();
@@ -1909,8 +1947,8 @@ export default function AdminDashboard() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h5 className="font-bold text-sm text-zinc-900 dark:text-white leading-snug">{adm.email}</h5>
-                            {adm.email.toLowerCase() === currentAdminEmail.toLowerCase() && (
+                            <h5 className="font-bold text-sm text-zinc-900 dark:text-white leading-snug">{adm.email || 'بدون بريد'}</h5>
+                            {adm.email && currentAdminEmail && adm.email.toLowerCase() === currentAdminEmail.toLowerCase() && (
                               <span className="text-[8px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-bold animate-pulse">أنت حالياً</span>
                             )}
                           </div>
@@ -1923,12 +1961,12 @@ export default function AdminDashboard() {
                       <button
                         onClick={() => handleDeleteAdmin(adm.email)}
                         className={`p-1.5 rounded-lg transition-colors ${
-                          adm.email.toLowerCase() === currentAdminEmail.toLowerCase() 
+                          adm.email && currentAdminEmail && adm.email.toLowerCase() === currentAdminEmail.toLowerCase() 
                             ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-600'
                             : 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400'
                         }`}
                         title="حذف المشرف"
-                        disabled={adm.email.toLowerCase() === currentAdminEmail.toLowerCase()}
+                        disabled={!!(adm.email && currentAdminEmail && adm.email.toLowerCase() === currentAdminEmail.toLowerCase())}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
