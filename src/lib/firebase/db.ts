@@ -59,8 +59,12 @@ function withDbTimeout<T>(promise: Promise<T>, timeoutMs = 3000): Promise<T> {
 // Helper to extract YouTube Video ID
 export const getYouTubeId = (url: string): string => {
   if (!url) return '';
+  const trimmed = url.trim();
+  if (trimmed.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    return trimmed;
+  }
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/i;
-  const match = url.match(regExp);
+  const match = trimmed.match(regExp);
   return (match && match[2].length === 11) ? match[2] : '';
 };
 

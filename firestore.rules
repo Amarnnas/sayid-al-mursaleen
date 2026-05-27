@@ -44,7 +44,9 @@ service cloud.firestore {
       allow read: if true;
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'downloads'])
+        request.resource.data.diff(resource.data).modifiedKeys().hasOnly(['views', 'downloads']) &&
+        request.resource.data.diff(resource.data).addedKeys().size() == 0 &&
+        request.resource.data.diff(resource.data).removedKeys().size() == 0
       );
     }
 
