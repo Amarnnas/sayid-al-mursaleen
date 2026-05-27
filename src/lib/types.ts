@@ -1,3 +1,10 @@
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: number; // millisecond timestamp
+}
+
 export interface Lecture {
   id: string;
   title: string;
@@ -5,6 +12,11 @@ export interface Lecture {
   sheikh: string;
   youtubeUrl: string;
   thumbnailUrl?: string;
+  categoryIds?: string[]; // IDs of associated categories
+  mp3Url?: string; // external direct audio link
+  slug?: string; // slug for clean URLs
+  views?: number; // total views count
+  downloads?: number; // total downloads count
   createdAt: number; // millisecond timestamp
 }
 
@@ -26,6 +38,7 @@ export interface GeneralSettings {
   facebookLink: string;
   youtubeChannel: string;
   liveStreamUrl: string;
+  tiktokLink?: string;
 }
 
 export interface PrayerOffsets {

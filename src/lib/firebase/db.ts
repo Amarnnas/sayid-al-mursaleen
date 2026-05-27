@@ -11,9 +11,10 @@ import {
   query, 
   where, 
   orderBy,
-  serverTimestamp
+  serverTimestamp,
+  increment
 } from 'firebase/firestore';
-import { Lecture, Announcement, GeneralSettings, PrayerSettings, Admin } from '../types';
+import { Lecture, Announcement, GeneralSettings, PrayerSettings, Admin, Category } from '../types';
 
 // Check if we are running in the browser
 const isBrowser = typeof window !== 'undefined';
@@ -57,7 +58,8 @@ function withDbTimeout<T>(promise: Promise<T>, timeoutMs = 3000): Promise<T> {
 
 // Helper to extract YouTube Video ID
 export const getYouTubeId = (url: string): string => {
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  if (!url) return '';
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/i;
   const match = url.match(regExp);
   return (match && match[2].length === 11) ? match[2] : '';
 };
@@ -66,6 +68,16 @@ export const getYouTubeId = (url: string): string => {
 export const getYouTubeThumbnail = (url: string): string => {
   const id = getYouTubeId(url);
   return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : '';
+};
+
+// Slug generation utility (handles Arabic and English)
+export const generateSlug = (text: string): string => {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF\s-]/g, '') // Keep alphanumeric, Arabic, spaces and hyphens
+    .replace(/\s+/g, '-') // spaces to hyphens
+    .replace(/-+/g, '-'); // collapse multiple hyphens
 };
 
 // --- DEFAULT SEED DATA ---
@@ -77,7 +89,8 @@ const defaultGeneralSettings: GeneralSettings = {
   whatsappLink: "https://wa.me/33700000000", // placeholder or real link
   facebookLink: "https://facebook.com",
   youtubeChannel: "https://www.youtube.com/@OfficialSydAL-Mursalin",
-  liveStreamUrl: ""
+  liveStreamUrl: "",
+  tiktokLink: ""
 };
 
 const defaultPrayerSettings: PrayerSettings = {
@@ -97,6 +110,15 @@ const defaultPrayerSettings: PrayerSettings = {
   longitude: 31.2357
 };
 
+export const defaultCategories: Category[] = [
+  { id: "cat-1", name: "خطب الجمعة", slug: "friday-sermons", createdAt: Date.now() },
+  { id: "cat-2", name: "التلاوات", slug: "recitations", createdAt: Date.now() },
+  { id: "cat-3", name: "الدروس", slug: "lessons", createdAt: Date.now() },
+  { id: "cat-4", name: "الثلاثيات الدعوية", slug: "three-minute-reminders", createdAt: Date.now() },
+  { id: "cat-5", name: "الرباعيات الدعوية", slug: "four-minute-reminders", createdAt: Date.now() },
+  { id: "cat-6", name: "التلاوات في الصلاة", slug: "prayer-recitations", createdAt: Date.now() }
+];
+
 const defaultLectures: Lecture[] = [
   {
     id: "lecture-1",
@@ -105,6 +127,10 @@ const defaultLectures: Lecture[] = [
     sheikh: "خطيب المسجد",
     youtubeUrl: "https://youtu.be/Vs2ibIIJrSk?si=VfUCUAQMV_WjV6R3",
     thumbnailUrl: "https://img.youtube.com/vi/Vs2ibIIJrSk/hqdefault.jpg",
+    categoryIds: ["cat-1"],
+    slug: "friday-sermon-lecture-1",
+    views: 142,
+    downloads: 12,
     createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000 // 3 days ago
   },
   {
@@ -114,6 +140,10 @@ const defaultLectures: Lecture[] = [
     sheikh: "خطيب المسجد",
     youtubeUrl: "https://youtu.be/sLNkh_Ulv4g?si=x17Gm7o27MabZb4L",
     thumbnailUrl: "https://img.youtube.com/vi/sLNkh_Ulv4g/hqdefault.jpg",
+    categoryIds: ["cat-1", "cat-3"],
+    slug: "excellent-friday-sermons-2",
+    views: 89,
+    downloads: 5,
     createdAt: Date.now() - 7 * 24 * 60 * 60 * 1000 // 7 days ago
   },
   {
@@ -123,6 +153,10 @@ const defaultLectures: Lecture[] = [
     sheikh: "دعاة المسجد",
     youtubeUrl: "https://youtu.be/2vn5Gp2gsXc?si=WxOeuvxIxqlVCC-Y",
     thumbnailUrl: "https://img.youtube.com/vi/2vn5Gp2gsXc/hqdefault.jpg",
+    categoryIds: ["cat-3"],
+    slug: "weekly-lesson-creed-3",
+    views: 65,
+    downloads: 2,
     createdAt: Date.now() - 12 * 24 * 60 * 60 * 1000 // 12 days ago
   },
   {
@@ -132,6 +166,10 @@ const defaultLectures: Lecture[] = [
     sheikh: "إمام المسجد",
     youtubeUrl: "https://youtu.be/vo48qB1gSxI?si=c9xuELkHpMaAzoLj",
     thumbnailUrl: "https://img.youtube.com/vi/vo48qB1gSxI/hqdefault.jpg",
+    categoryIds: ["cat-2", "cat-6"],
+    slug: "touching-recitation-mosque-4",
+    views: 204,
+    downloads: 48,
     createdAt: Date.now() - 15 * 24 * 60 * 60 * 1000 // 15 days ago
   }
 ];
@@ -185,6 +223,9 @@ const ensureMockSeeded = () => {
   }
   if (!localStorage.getItem('saed_prayer_settings')) {
     mockDb.set('prayer_settings', defaultPrayerSettings);
+  }
+  if (!localStorage.getItem('saed_categories')) {
+    mockDb.set('categories', defaultCategories);
   }
   if (!localStorage.getItem('saed_lectures')) {
     mockDb.set('lectures', defaultLectures);
@@ -368,11 +409,37 @@ export const getLectures = async (): Promise<Lecture[]> => {
   return all.sort((a, b) => b.createdAt - a.createdAt);
 };
 
+export const isLectureDuplicate = async (youtubeUrl: string, excludeId?: string): Promise<boolean> => {
+  const videoId = getYouTubeId(youtubeUrl);
+  if (!videoId) return false;
+  
+  const lectures = await getLectures();
+  const lowerUrl = youtubeUrl.trim().toLowerCase();
+  const lowerVideoId = videoId.toLowerCase();
+  
+  return lectures.some(lec => {
+    if (excludeId && lec.id === excludeId) return false;
+    const existingVideoId = getYouTubeId(lec.youtubeUrl).toLowerCase();
+    const existingUrl = lec.youtubeUrl.trim().toLowerCase();
+    return existingVideoId === lowerVideoId || existingUrl === lowerUrl;
+  });
+};
+
 export const addLecture = async (lec: Omit<Lecture, 'id'>): Promise<string> => {
+  // Check for duplicates
+  const isDuplicate = await isLectureDuplicate(lec.youtubeUrl);
+  if (isDuplicate) {
+    throw new Error("هذه المحاضرة موجودة مسبقًا");
+  }
+  
   const newId = `lec-${Date.now()}`;
+  const slug = generateSlug(lec.title) || newId;
   const completeLec: Lecture = {
     ...lec,
     id: newId,
+    slug,
+    views: 0,
+    downloads: 0,
     thumbnailUrl: lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl)
   };
   
@@ -380,6 +447,9 @@ export const addLecture = async (lec: Omit<Lecture, 'id'>): Promise<string> => {
     try {
       const docRef = await withDbTimeout(addDoc(collection(db, 'lectures'), {
         ...lec,
+        slug,
+        views: 0,
+        downloads: 0,
         thumbnailUrl: lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl)
       }));
       return docRef.id;
@@ -395,9 +465,19 @@ export const addLecture = async (lec: Omit<Lecture, 'id'>): Promise<string> => {
 };
 
 export const updateLecture = async (id: string, updates: Partial<Lecture>): Promise<void> => {
+  if (updates.youtubeUrl) {
+    const isDuplicate = await isLectureDuplicate(updates.youtubeUrl, id);
+    if (isDuplicate) {
+      throw new Error("هذه المحاضرة موجودة مسبقًا");
+    }
+  }
+  
   const cleanUpdates = { ...updates };
   if (updates.youtubeUrl && !updates.thumbnailUrl) {
     cleanUpdates.thumbnailUrl = getYouTubeThumbnail(updates.youtubeUrl);
+  }
+  if (updates.title) {
+    cleanUpdates.slug = generateSlug(updates.title);
   }
   
   if (isFirebaseConfigured()) {
@@ -429,6 +509,129 @@ export const deleteLecture = async (id: string): Promise<void> => {
   const current: Lecture[] = mockDb.get('lectures', defaultLectures);
   const filtered = current.filter(item => item.id !== id);
   mockDb.set('lectures', filtered);
+};
+
+// --- VIEWS & DOWNLOADS ---
+export const incrementLectureViews = async (id: string): Promise<void> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'lectures', id);
+      await withDbTimeout(updateDoc(docRef, { views: increment(1) }));
+      return;
+    } catch (e) {
+      console.error("Firebase incrementLectureViews error:", e);
+    }
+  }
+  
+  const current: Lecture[] = mockDb.get('lectures', defaultLectures);
+  const updated = current.map(item => item.id === id ? { ...item, views: (item.views || 0) + 1 } : item);
+  mockDb.set('lectures', updated);
+};
+
+export const incrementLectureDownloads = async (id: string): Promise<void> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'lectures', id);
+      await withDbTimeout(updateDoc(docRef, { downloads: increment(1) }));
+      return;
+    } catch (e) {
+      console.error("Firebase incrementLectureDownloads error:", e);
+    }
+  }
+  
+  const current: Lecture[] = mockDb.get('lectures', defaultLectures);
+  const updated = current.map(item => item.id === id ? { ...item, downloads: (item.downloads || 0) + 1 } : item);
+  mockDb.set('lectures', updated);
+};
+
+// --- CATEGORIES ---
+export const getCategories = async (): Promise<Category[]> => {
+  if (isFirebaseConfigured()) {
+    try {
+      const collRef = collection(db, 'categories');
+      const q = query(collRef, orderBy('createdAt', 'desc'));
+      const querySnap = await withDbTimeout(getDocs(q));
+      const list: Category[] = [];
+      querySnap.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() } as Category);
+      });
+      if (list.length > 0) return list;
+    } catch (e) {
+      console.warn("Firebase failed, falling back to LocalStorage mock", e);
+    }
+  }
+  
+  const all: Category[] = mockDb.get('categories', defaultCategories);
+  return all.sort((a, b) => b.createdAt - a.createdAt);
+};
+
+export const addCategory = async (cat: Omit<Category, 'id'>): Promise<string> => {
+  const newId = `cat-${Date.now()}`;
+  const completeCat: Category = {
+    ...cat,
+    id: newId,
+    slug: cat.slug || generateSlug(cat.name)
+  };
+  
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = await withDbTimeout(addDoc(collection(db, 'categories'), {
+        ...cat,
+        slug: cat.slug || generateSlug(cat.name)
+      }));
+      return docRef.id;
+    } catch (e) {
+      console.error("Firebase addCategory error:", e);
+    }
+  }
+  
+  const current: Category[] = mockDb.get('categories', defaultCategories);
+  current.push(completeCat);
+  mockDb.set('categories', current);
+  return newId;
+};
+
+export const updateCategory = async (id: string, updates: Partial<Category>): Promise<void> => {
+  const cleanUpdates = { ...updates };
+  if (updates.name && !updates.slug) {
+    cleanUpdates.slug = generateSlug(updates.name);
+  }
+  
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'categories', id);
+      await withDbTimeout(updateDoc(docRef, cleanUpdates));
+      return;
+    } catch (e) {
+      console.error("Firebase updateCategory error:", e);
+    }
+  }
+  
+  const current: Category[] = mockDb.get('categories', defaultCategories);
+  const updated = current.map(item => item.id === id ? { ...item, ...cleanUpdates } : item);
+  mockDb.set('categories', updated);
+};
+
+export const deleteCategory = async (id: string): Promise<void> => {
+  const lectures = await getLectures();
+  const isLinked = lectures.some(lec => lec.categoryIds?.includes(id));
+  if (isLinked) {
+    throw new Error("لا يمكن حذف هذا التصنيف لأنه مرتبط بمحاضرات قائمة. يرجى تعديل أو حذف المحاضرات المرتبطة أولاً.");
+  }
+
+  if (isFirebaseConfigured()) {
+    try {
+      const docRef = doc(db, 'categories', id);
+      await withDbTimeout(deleteDoc(docRef));
+      return;
+    } catch (e) {
+      console.error("Firebase deleteCategory error:", e);
+    }
+  }
+  
+  const current: Category[] = mockDb.get('categories', defaultCategories);
+  const filtered = current.filter(item => item.id !== id);
+  mockDb.set('categories', filtered);
 };
 
 // 5. ADMINS

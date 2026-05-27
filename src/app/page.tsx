@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { 
   getGeneralSettings, 
   getPrayerSettings, 
   getAnnouncements, 
-  getLectures 
+  getLectures,
+  getCategories
 } from '../lib/firebase/db';
-import { GeneralSettings, PrayerSettings, Announcement, Lecture } from '../lib/types';
+import { GeneralSettings, PrayerSettings, Announcement, Lecture, Category } from '../lib/types';
 import PrayerTimesCard from '../components/PrayerTimesCard';
 import AnnouncementCard from '../components/AnnouncementCard';
 import LectureCard from '../components/LectureCard';
@@ -15,15 +16,20 @@ import AccessibilityWidget from '../components/AccessibilityWidget';
 import { 
   Phone, 
   Radio, 
-  ArrowLeft, 
   ExternalLink, 
   Compass, 
-  ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Search,
+  SlidersHorizontal,
+  FolderOpen,
+  X,
+  Inbox,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 
-// Custom inline SVG icons to avoid Lucide React version compatibility issues
+// Custom inline SVG icons
 const YoutubeIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -48,24 +54,63 @@ const FacebookIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export default function Home() {
+const TiktokIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    stroke="none"
+    className={props.className}
+    style={props.style}
+  >
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.02 1.59 4.23.94.13 1.89.11 2.83.1v3.96c-1.25-.02-2.5-.33-3.62-1.02-.03 1.83-.01 3.67-.02 5.51 0 .61-.03 1.22-.09 1.83-.4 3.08-2.68 5.76-5.83 6.3-3.61.73-7.39-1.39-8.49-4.88-1.21-3.66.45-8.03 4.02-9.45.89-.37 1.84-.54 2.8-.52-.01 1.34 0 2.68-.01 4.02-.7-.11-1.42-.03-2.07.28-1.42.66-2.22 2.3-1.89 3.84.34 1.7 1.94 2.92 3.67 2.65 1.56-.2 2.82-1.5 2.88-3.07.03-3.95.01-7.9.02-11.85-.01-.73.49-1.4 1.13-1.63.3-.11.62-.13.94-.13z"/>
+  </svg>
+);
+
+// Normalize Arabic text to support extremely flexible search
+const normalizeArabic = (text: string): string => {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/[ىي]/g, 'ي')
+    .replace(/[\u064B-\u0652]/g, ''); // remove tashkeel/diacritics
+};
+
+function HomeContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // --- States ---
   const [generalSettings, setGeneralSettings] = useState<GeneralSettings | null>(null);
   const [prayerSettings, setPrayerSettings] = useState<PrayerSettings | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [lectures, setLectures] = useState<Lecture[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // --- Search, Filter & Sort States (Synced with URL) ---
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [sortOption, setSortOption] = useState('newest');
+  const [visibleCount, setVisibleCount] = useState(8);
+
+  // Load static data once
   const loadData = async () => {
     try {
       const gen = await getGeneralSettings();
       const pray = await getPrayerSettings();
-      const anns = await getAnnouncements(true); // only active announcements
+      const anns = await getAnnouncements(true); // only active
       const lecs = await getLectures();
+      const cats = await getCategories();
 
       setGeneralSettings(gen);
       setPrayerSettings(pray);
       setAnnouncements(anns);
       setLectures(lecs);
+      setCategories(cats);
     } catch (e) {
       console.error("Error loading home page data:", e);
     } finally {
@@ -76,6 +121,61 @@ export default function Home() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Sync states from URL query params on load or URL change
+  useEffect(() => {
+    const search = searchParams.get('search') || '';
+    const category = searchParams.get('category') || 'all';
+    const sort = searchParams.get('sort') || 'newest';
+
+    setSearchInput(search);
+    setSearchQuery(search);
+    setSelectedCategory(category);
+    setSortOption(sort);
+  }, [searchParams]);
+
+  // Debounce search input to improve performance
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      // Smoothly update URL params
+      const params = new URLSearchParams(searchParams.toString());
+      if (searchInput) params.set('search', searchInput);
+      else params.delete('search');
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      setSearchQuery(searchInput);
+    }, 350);
+
+    return () => clearTimeout(handler);
+  }, [searchInput]);
+
+  // Update Category & Sort URL params
+  const handleCategoryChange = (catId: string) => {
+    setSelectedCategory(catId);
+    setVisibleCount(8); // Reset pagination on filter change
+    
+    const params = new URLSearchParams(searchParams.toString());
+    if (catId !== 'all') params.set('category', catId);
+    else params.delete('category');
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handleSortChange = (sort: string) => {
+    setSortOption(sort);
+    
+    const params = new URLSearchParams(searchParams.toString());
+    if (sort !== 'newest') params.set('sort', sort);
+    else params.delete('sort');
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const clearSearch = () => {
+    setSearchInput('');
+    setSearchQuery('');
+    
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('search');
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   if (loading) {
     return (
@@ -91,6 +191,68 @@ export default function Home() {
 
   const gen = generalSettings!;
   const pray = prayerSettings!;
+
+  // --- Filtration & Sorting Logic ---
+  const normalizedQuery = normalizeArabic(searchQuery);
+
+  const filteredLectures = lectures
+    .filter((lec) => {
+      // 1. Category Filter
+      if (selectedCategory !== 'all') {
+        if (!lec.categoryIds || !lec.categoryIds.includes(selectedCategory)) {
+          return false;
+        }
+      }
+
+      // 2. Search Text Filter (Title, Sheikh Name, Category Name)
+      if (normalizedQuery) {
+        const normTitle = normalizeArabic(lec.title);
+        const normSheikh = normalizeArabic(lec.sheikh);
+        const normDesc = normalizeArabic(lec.description || '');
+        
+        // Find if matches category name associated
+        const hasMatchingCategoryName = lec.categoryIds
+          ? lec.categoryIds.some(cId => {
+              const cat = categories.find(c => c.id === cId);
+              return cat ? normalizeArabic(cat.name).includes(normalizedQuery) : false;
+            })
+          : false;
+
+        return (
+          normTitle.includes(normalizedQuery) ||
+          normSheikh.includes(normalizedQuery) ||
+          normDesc.includes(normalizedQuery) ||
+          hasMatchingCategoryName
+        );
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      // 3. Sorting Options
+      switch (sortOption) {
+        case 'oldest':
+          return a.createdAt - b.createdAt;
+        case 'alphabetical':
+          return a.title.localeCompare(b.title, 'ar');
+        case 'most_viewed':
+          return (b.views || 0) - (a.views || 0);
+        case 'most_downloaded':
+          return (b.downloads || 0) - (a.downloads || 0);
+        case 'newest':
+        default:
+          return b.createdAt - a.createdAt;
+      }
+    });
+
+  // Paginated lectures
+  const paginatedLectures = filteredLectures.slice(0, visibleCount);
+
+  // Helper to count lectures per category for badge counts
+  const getLectureCountForCategory = (catId: string) => {
+    if (catId === 'all') return lectures.length;
+    return lectures.filter(l => l.categoryIds?.includes(catId)).length;
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-950 font-sans antialiased text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
@@ -108,7 +270,7 @@ export default function Home() {
               />
             ) : (
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white dark:bg-emerald-500 shadow-md">
-                <Compass className="w-5 h-5 animate-pulse-slow" />
+                <Compass className="w-5 h-5" />
               </div>
             )}
             <div>
@@ -145,8 +307,7 @@ export default function Home() {
       </header>
 
       {/* 2. Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/60 via-white to-zinc-50 py-16 md:py-24 dark:from-emerald-950/10 dark:via-zinc-950 dark:to-zinc-950">
-        {/* Subtle Islamic Geometrics Vector Overlay */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/60 via-white to-zinc-50 py-12 md:py-20 dark:from-emerald-950/10 dark:via-zinc-950 dark:to-zinc-950">
         <div className="absolute inset-0 z-0 opacity-[0.03] dark:opacity-[0.02] flex items-center justify-center select-none pointer-events-none">
           <svg width="600" height="600" viewBox="0 0 100 100" fill="currentColor">
             <path d="M50 0 L60 40 L100 50 L60 60 L50 100 L40 60 L0 50 L40 40 Z" />
@@ -154,41 +315,40 @@ export default function Home() {
         </div>
 
         <div className="relative z-10 mx-auto max-w-4xl px-4 text-center">
-          {/* Mosque Logo */}
           <div className="mb-6 inline-block">
             <div className="relative">
               <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-2xl scale-150 animate-pulse-slow"></div>
               <img 
                 src={gen.logoUrl || '/logo.png'} 
                 alt="شعار مسجد سيد المرسلين" 
-                className="relative h-24 w-24 md:h-28 md:w-28 object-contain rounded-3xl shadow-2xl shadow-emerald-600/10 border-2 border-white/60 dark:border-zinc-700/60 bg-white dark:bg-zinc-900 p-2"
+                className="relative h-20 w-20 md:h-24 md:w-24 object-contain rounded-3xl shadow-2xl border-2 border-white/60 dark:border-zinc-700/60 bg-white dark:bg-zinc-900 p-2"
               />
             </div>
           </div>
 
-          <span className="inline-flex items-center gap-1 bg-emerald-100/60 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold px-3 py-1 rounded-full mb-4">
-            أهلاً بكم في بيت من بيوت الله
+          <span className="inline-flex items-center gap-1 bg-emerald-100/60 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold px-3 py-1 rounded-full mb-3">
+            بيت من بيوت الله يرحب بكم
           </span>
           
-          <h2 className="text-3xl md:text-5xl font-black text-zinc-900 dark:text-white leading-tight tracking-tight">
+          <h2 className="text-2xl md:text-4xl font-black text-zinc-900 dark:text-white leading-tight tracking-tight">
             مرحباً بكم في <span className="text-emerald-700 dark:text-emerald-400">{gen.mosqueName}</span>
           </h2>
           
-          <p className="mx-auto mt-4 max-w-2xl text-base md:text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
+          <p className="mx-auto mt-3 max-w-2xl text-sm md:text-base leading-relaxed text-zinc-600 dark:text-zinc-400">
             {gen.description}
           </p>
 
           {/* Social Quick Buttons */}
-          <div className="mt-8 flex flex-wrap justify-center items-center gap-3">
+          <div className="mt-6 flex flex-wrap justify-center items-center gap-3">
             {gen.youtubeChannel && (
               <a 
                 href={gen.youtubeChannel} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold text-sm px-5 py-2.5 rounded-2xl shadow-lg shadow-red-600/10 hover:shadow-red-600/25 transition-all duration-200"
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-md transition-colors"
               >
-                <YoutubeIcon className="w-4 h-4 fill-current animate-pulse-slow" />
-                <span>قناة اليوتيوب الرسمية</span>
+                <YoutubeIcon className="w-4 h-4 fill-current" />
+                <span>قناة اليوتيوب</span>
               </a>
             )}
 
@@ -197,10 +357,10 @@ export default function Home() {
                 href={gen.facebookLink} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-5 py-2.5 rounded-2xl shadow-lg shadow-blue-600/10 hover:shadow-blue-600/25 transition-all duration-200"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-md transition-colors"
               >
                 <FacebookIcon className="w-4 h-4 fill-current" />
-                <span>صفحة الفيسبوك</span>
+                <span>الفيسبوك</span>
               </a>
             )}
 
@@ -209,19 +369,30 @@ export default function Home() {
                 href={gen.whatsappLink} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-5 py-2.5 rounded-2xl shadow-lg shadow-emerald-600/10 hover:shadow-emerald-600/25 transition-all duration-200"
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-md transition-colors"
               >
-                {/* Whatsapp is green, we map phone/whatsapp */}
                 <Phone className="w-4 h-4 fill-current" />
                 <span>مجموعة الواتساب</span>
+              </a>
+            )}
+
+            {gen.tiktokLink && (
+              <a 
+                href={gen.tiktokLink} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-md transition-colors dark:bg-zinc-800 dark:hover:bg-zinc-700"
+              >
+                <TiktokIcon className="w-4 h-4 fill-current" />
+                <span>تيك توك</span>
               </a>
             )}
           </div>
         </div>
       </section>
 
-      {/* 3. Main Body Container (Prayer Times, Announcements, Sermons) */}
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 flex-1 flex flex-col gap-12">
+      {/* 3. Main Body Container */}
+      <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 flex-1 flex flex-col gap-10">
         
         {/* Dynamic Prayer Widget */}
         <section className="w-full">
@@ -231,10 +402,10 @@ export default function Home() {
         {/* Announcements section */}
         {announcements.length > 0 && (
           <section className="w-full animate-fade-in">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 mb-6">
-              <h3 className="text-xl font-extrabold text-zinc-950 dark:text-white flex items-center gap-2">
-                <span className="w-2.5 h-6 bg-emerald-600 dark:bg-emerald-500 rounded-full"></span>
-                أحدث الإعلانات والتنبيهات
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 mb-5">
+              <h3 className="text-lg font-extrabold text-zinc-950 dark:text-white flex items-center gap-2">
+                <span className="w-2 h-5 bg-emerald-600 dark:bg-emerald-500 rounded-full"></span>
+                الإعلانات والتعميمات
               </h3>
             </div>
             
@@ -247,117 +418,176 @@ export default function Home() {
         )}
 
         {/* Sermons and Recitations section */}
-        <section className="w-full">
-          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 mb-6">
-            <h3 className="text-xl font-extrabold text-zinc-950 dark:text-white flex items-center gap-2">
-              <span className="w-2.5 h-6 bg-emerald-600 dark:bg-emerald-500 rounded-full"></span>
-              الخطب والتلاوات والدروس
+        <section className="w-full flex flex-col gap-6">
+          
+          {/* Section Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4 gap-4">
+            <h3 className="text-lg font-extrabold text-zinc-950 dark:text-white flex items-center gap-2">
+              <span className="w-2 h-5 bg-emerald-600 dark:bg-emerald-500 rounded-full"></span>
+              الخطب والدروس والتلاوات
             </h3>
             
-            {gen.youtubeChannel && (
-              <a 
-                href={gen.youtubeChannel} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-              >
-                <span>شاهد المزيد على يوتيوب</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            )}
+            {/* Search Input Field */}
+            <div className="relative max-w-xs w-full">
+              <input 
+                type="text" 
+                placeholder="ابحث بالعنوان، الشيخ، أو التصنيف..."
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                className="w-full rounded-2xl border border-zinc-200 pl-10 pr-4 py-2 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-900"
+              />
+              <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-zinc-400" />
+              {searchInput && (
+                <button 
+                  onClick={clearSearch}
+                  className="absolute left-10 top-2.5 p-0.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           </div>
 
-          {lectures.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {lectures.map((lec) => (
-                <LectureCard key={lec.id} lecture={lec} />
-              ))}
+          {/* Filtering and Sorting Bar */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-zinc-900 p-4 rounded-3xl border border-zinc-200/50 dark:border-zinc-800/60 shadow-sm">
+            
+            {/* Category Filter Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto py-1 scrollbar-none">
+              <button
+                onClick={() => handleCategoryChange('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-all cursor-pointer ${
+                  selectedCategory === 'all'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10'
+                    : 'bg-zinc-50 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                الكل ({getLectureCountForCategory('all')})
+              </button>
+              
+              {categories.map((cat) => {
+                const count = getLectureCountForCategory(cat.id);
+                if (count === 0 && selectedCategory !== cat.id) return null; // hide empty categories unless active
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => handleCategoryChange(cat.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-all cursor-pointer ${
+                      selectedCategory === cat.id
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10'
+                        : 'bg-zinc-50 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                    }`}
+                  >
+                    {cat.name} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Sorting Select */}
+            <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
+              <SlidersHorizontal className="w-4 h-4 text-emerald-600" />
+              <select
+                value={sortOption}
+                onChange={e => handleSortChange(e.target.value)}
+                className="bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 cursor-pointer"
+              >
+                <option value="newest">الأحدث نشرًا</option>
+                <option value="oldest">الأقدم نشرًا</option>
+                <option value="alphabetical">الترتيب الأبجدي</option>
+                <option value="most_viewed">الأكثر مشاهدة</option>
+                <option value="most_downloaded">الأكثر تحميلًا للصوت</option>
+              </select>
+            </div>
+
+          </div>
+
+          {/* Lectures Grid or Empty State */}
+          {paginatedLectures.length > 0 ? (
+            <div className="flex flex-col gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                {paginatedLectures.map((lec) => {
+                  // Get category names associated
+                  const lecCats = lec.categoryIds
+                    ? (lec.categoryIds
+                        .map(cId => categories.find(c => c.id === cId)?.name)
+                        .filter(Boolean) as string[])
+                    : [];
+                  return (
+                    <LectureCard 
+                      key={lec.id} 
+                      lecture={lec} 
+                      categoryNames={lecCats}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Pagination Show More Button */}
+              {filteredLectures.length > paginatedLectures.length && (
+                <div className="flex justify-center mt-4">
+                  <button
+                    onClick={() => setVisibleCount(prev => prev + 8)}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-6 py-3 rounded-2xl shadow-md transition-all active:scale-98 cursor-pointer"
+                  >
+                    <span>عرض المزيد من المحاضرات</span>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="w-full text-center py-12 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
-              <p className="text-zinc-500">لا توجد محاضرات أو خطب مسجلة حالياً.</p>
+            /* Beautiful Empty State */
+            <div className="w-full text-center py-16 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm flex flex-col items-center justify-center p-6 animate-fade-in">
+              <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-500 flex items-center justify-center rounded-2xl mb-4">
+                <Inbox className="w-8 h-8" />
+              </div>
+              <h4 className="font-extrabold text-base text-zinc-900 dark:text-white">لم يتم العثور على أي نتائج</h4>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 max-w-sm leading-relaxed">
+                لا توجد محاضرات تطابق خيارات التصفية أو البحث الحالية. جرب تعديل نص البحث أو تصفح تصنيفاً آخر.
+              </p>
+              {(searchQuery || selectedCategory !== 'all') && (
+                <button
+                  onClick={() => {
+                    setSearchInput('');
+                    setSearchQuery('');
+                    handleCategoryChange('all');
+                  }}
+                  className="mt-4 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline dark:text-emerald-400"
+                >
+                  إعادة تعيين فلاتر البحث
+                </button>
+              )}
             </div>
           )}
+
         </section>
 
       </main>
 
       {/* 4. Footer Section */}
-      <footer className="mt-12 bg-white dark:bg-zinc-950 border-t border-zinc-200/50 dark:border-zinc-900/50">
-        <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Mosque details */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <img 
-                  src={gen.logoUrl || '/logo.png'} 
-                  alt="شعار المسجد" 
-                  className="h-10 w-10 object-contain rounded-xl bg-white dark:bg-zinc-800 p-1 border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm"
-                />
-                <h4 className="font-extrabold text-zinc-900 dark:text-white">{gen.mosqueName}</h4>
-              </div>
-              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400 max-w-sm">
-                موقع متكامل يهدف لنشر قيم الإسلام السمحة وتقديم كافة الخدمات والفعاليات والدروس لمجتمع المصلين ومحبي العلم الشرعي.
-              </p>
-            </div>
-
-            {/* Quick coordinates and contact */}
-            <div className="flex flex-col gap-3">
-              <h5 className="font-bold text-sm text-zinc-800 dark:text-zinc-200">معلومات الاتصال</h5>
-              <ul className="flex flex-col gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                <li className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
-                  <span>{gen.contactPhone}</span>
-                </li>
-                <li>
-                  <span>الموقع: إحداثيات خط العرض ({pray.latitude.toFixed(4)}) - خط الطول ({pray.longitude.toFixed(4)})</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Social channels and links */}
-            <div className="flex flex-col gap-3">
-              <h5 className="font-bold text-sm text-zinc-800 dark:text-zinc-200">تابعونا على</h5>
-              <div className="flex items-center gap-3">
-                {gen.youtubeChannel && (
-                  <a 
-                    href={gen.youtubeChannel} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 transition-colors"
-                  >
-                    <YoutubeIcon className="w-5 h-5 fill-current" />
-                  </a>
-                )}
-                {gen.facebookLink && (
-                  <a 
-                    href={gen.facebookLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400 transition-colors"
-                  >
-                    <FacebookIcon className="w-5 h-5 fill-current" />
-                  </a>
-                )}
-                <Link
-                  href="/admin"
-                  className="p-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 transition-colors"
-                  title="لوحة تحكم المشرف"
-                >
-                  <ShieldCheck className="w-5 h-5" />
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-900/60 text-center text-[10px] text-zinc-400 dark:text-zinc-500">
-            <p>جميع الحقوق محفوظة لمسجد سيد المرسلين © {new Date().getFullYear()}</p>
-          </div>
+      <footer className="mt-16 bg-white dark:bg-zinc-950 border-t border-zinc-200/50 dark:border-zinc-900/50">
+        <div className="mx-auto max-w-6xl px-4 py-8 md:px-6 text-center text-[10px] text-zinc-400 dark:text-zinc-500">
+          <p>جميع الحقوق محفوظة لمسجد سيد المرسلين © {new Date().getFullYear()}</p>
         </div>
       </footer>
 
       {/* Floating Accessibility Controls for Eldely */}
       <AccessibilityWidget />
     </div>
+  );
+}
+
+function HomeFallback() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-600 border-t-transparent"></div>
+    </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<HomeFallback />}>
+      <HomeContent />
+    </Suspense>
   );
 }

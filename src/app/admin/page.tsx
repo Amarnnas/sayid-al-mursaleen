@@ -12,6 +12,7 @@ import {
   deleteAnnouncement,
   getLectures,
   addLecture,
+  updateLecture,
   deleteLecture,
   getYouTubeId,
   getYouTubeThumbnail,
@@ -19,9 +20,14 @@ import {
   addAdmin,
   deleteAdmin,
   checkAdminEmail,
-  isFirebaseConfigured
+  isFirebaseConfigured,
+  getCategories,
+  addCategory,
+  updateCategory,
+  deleteCategory,
+  generateSlug
 } from '../../lib/firebase/db';
-import { GeneralSettings, PrayerSettings, Announcement, Lecture, Admin } from '../../lib/types';
+import { GeneralSettings, PrayerSettings, Announcement, Lecture, Admin, Category } from '../../lib/types';
 import { auth } from '../../lib/firebase/config';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import Toast from '../../components/Toast';
@@ -45,7 +51,10 @@ import {
   UserPlus,
   Loader2,
   ShieldCheck,
-  Timer
+  Timer,
+  Tags,
+  Pencil,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -95,7 +104,7 @@ export default function AdminDashboard() {
   const [loginError, setLoginError] = useState('');
 
   // --- Active Tab ---
-  const [activeTab, setActiveTab] = useState<'general' | 'prayer' | 'announcements' | 'lectures' | 'admins'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'prayer' | 'announcements' | 'lectures' | 'admins' | 'categories'>('general');
 
   // --- Settings States ---
   const [general, setGeneral] = useState<GeneralSettings | null>(null);
@@ -105,12 +114,28 @@ export default function AdminDashboard() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   
   // --- Form Insertion States ---
   const [newAnn, setNewAnn] = useState({ title: '', content: '', imageUrl: '' });
-  const [newLec, setNewLec] = useState({ title: '', sheikh: 'خطيب المسجد', youtubeUrl: '', description: '', thumbnailUrl: '' });
+  const [newLec, setNewLec] = useState({ 
+    title: '', 
+    sheikh: 'خطيب المسجد', 
+    youtubeUrl: '', 
+    description: '', 
+    thumbnailUrl: '', 
+    mp3Url: '',
+    categoryIds: [] as string[]
+  });
+  const [newCategory, setNewCategory] = useState({ name: '', slug: '' });
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminRole, setNewAdminRole] = useState<'super_admin' | 'admin'>('admin');
+
+  // --- Editing states ---
+  const [editingLectureId, setEditingLectureId] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+  const [editingCategorySlug, setEditingCategorySlug] = useState('');
 
   // --- Notification Banner States ---
   const [successMsg, setSuccessMsg] = useState('');
@@ -185,12 +210,14 @@ export default function AdminDashboard() {
         const annData = await getAnnouncements(false); // get both active and inactive
         const lecData = await getLectures();
         const admData = await getAdmins();
+        const catData = await getCategories();
 
         setGeneral(genData);
         setPrayer(prayData);
         setAnnouncements(annData);
         setLectures(lecData);
         setAdmins(admData);
+        setCategories(catData);
       } catch (e) {
         console.error("Failed fetching admin data:", e);
         setErrorMsg("حدث خطأ أثناء تحميل بيانات المسجد.");
@@ -544,7 +571,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Add lecture
+  // Add or Edit lecture
   const handleAddLecture = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLec.youtubeUrl) {
@@ -584,27 +611,74 @@ export default function AdminDashboard() {
         finalDescription = "لم يتم إضافة تفاصيل لهذه المحاضرة.";
       }
       
-      await addLecture({
+      const lectureData = {
         title: finalTitle,
         sheikh: finalSheikh,
         youtubeUrl: newLec.youtubeUrl,
         description: finalDescription,
-        createdAt: Date.now(),
-        thumbnailUrl: finalThumbnail
-      });
+        thumbnailUrl: finalThumbnail,
+        mp3Url: newLec.mp3Url.trim() || undefined,
+        categoryIds: newLec.categoryIds
+      };
       
-      setSuccessMsg("تمت إضافة المحاضرة/الخطبة بنجاح!");
-      setNewLec({ title: '', sheikh: 'خطيب المسجد', youtubeUrl: '', description: '', thumbnailUrl: '' });
+      if (editingLectureId) {
+        await updateLecture(editingLectureId, lectureData);
+        setSuccessMsg("تم تعديل المحاضرة بنجاح!");
+        setEditingLectureId(null);
+      } else {
+        await addLecture({
+          ...lectureData,
+          createdAt: Date.now()
+        });
+        setSuccessMsg("تمت إضافة المحاضرة/الخطبة بنجاح!");
+      }
+      
+      setNewLec({ 
+        title: '', 
+        sheikh: 'خطيب المسجد', 
+        youtubeUrl: '', 
+        description: '', 
+        thumbnailUrl: '', 
+        mp3Url: '',
+        categoryIds: []
+      });
       
       // Reload lectures list
       const updated = await getLectures();
       setLectures(updated);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setErrorMsg("فشل إضافة المحاضرة.");
+      setErrorMsg(e.message || "حدث خطأ أثناء حفظ المحاضرة.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditLecture = (lec: Lecture) => {
+    setEditingLectureId(lec.id);
+    setNewLec({
+      title: lec.title,
+      sheikh: lec.sheikh,
+      youtubeUrl: lec.youtubeUrl,
+      description: lec.description,
+      thumbnailUrl: lec.thumbnailUrl || '',
+      mp3Url: lec.mp3Url || '',
+      categoryIds: lec.categoryIds || []
+    });
+    setActiveTab('lectures');
+  };
+
+  const handleCancelEditLecture = () => {
+    setEditingLectureId(null);
+    setNewLec({
+      title: '',
+      sheikh: 'خطيب المسجد',
+      youtubeUrl: '',
+      description: '',
+      thumbnailUrl: '',
+      mp3Url: '',
+      categoryIds: []
+    });
   };
 
   // Delete lecture
@@ -616,6 +690,79 @@ export default function AdminDashboard() {
       setSuccessMsg("تم حذف المحاضرة بنجاح.");
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // --- CATEGORY ACTIONS ---
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategory.name.trim()) {
+      setErrorMsg("يرجى إدخال اسم التصنيف.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const slug = newCategory.slug.trim() || generateSlug(newCategory.name.trim());
+      await addCategory({
+        name: newCategory.name.trim(),
+        slug,
+        createdAt: Date.now()
+      });
+      setSuccessMsg("تم إضافة التصنيف بنجاح!");
+      setNewCategory({ name: '', slug: '' });
+      const updated = await getCategories();
+      setCategories(updated);
+    } catch (e: any) {
+      console.error(e);
+      setErrorMsg(e.message || "حدث خطأ أثناء إضافة التصنيف.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditCategory = (cat: Category) => {
+    setEditingCategoryId(cat.id);
+    setEditingCategoryName(cat.name);
+    setEditingCategorySlug(cat.slug);
+  };
+
+  const handleSaveCategory = async (id: string) => {
+    if (!editingCategoryName.trim()) {
+      setErrorMsg("اسم التصنيف لا يمكن أن يكون فارغاً.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const slug = editingCategorySlug.trim() || generateSlug(editingCategoryName.trim());
+      await updateCategory(id, {
+        name: editingCategoryName.trim(),
+        slug
+      });
+      setSuccessMsg("تم تعديل التصنيف بنجاح!");
+      setEditingCategoryId(null);
+      const updated = await getCategories();
+      setCategories(updated);
+    } catch (e: any) {
+      console.error(e);
+      setErrorMsg(e.message || "فشل تعديل التصنيف.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!window.confirm("هل أنت متأكد من حذف هذا التصنيف؟")) return;
+    setLoading(true);
+    try {
+      await deleteCategory(id);
+      setSuccessMsg("تم حذف التصنيف بنجاح.");
+      const updated = await getCategories();
+      setCategories(updated);
+    } catch (e: any) {
+      console.error(e);
+      setErrorMsg(e.message || "حدث خطأ أثناء حذف التصنيف.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -863,6 +1010,18 @@ export default function AdminDashboard() {
           </button>
 
           <button 
+            onClick={() => setActiveTab('categories')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+              activeTab === 'categories' 
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10' 
+                : 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Tags className="w-4 h-4" />
+            <span>إدارة التصنيفات</span>
+          </button>
+
+          <button 
             onClick={() => setActiveTab('admins')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === 'admins' 
@@ -982,6 +1141,17 @@ export default function AdminDashboard() {
                       placeholder="رابط البث المباشر النشط"
                       value={general.liveStreamUrl}
                       onChange={e => setGeneral({ ...general, liveStreamUrl: e.target.value })}
+                      className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">حساب تيك توك (TikTok)</label>
+                    <input 
+                      type="url" 
+                      placeholder="https://tiktok.com/@..."
+                      value={general.tiktokLink || ''}
+                      onChange={e => setGeneral({ ...general, tiktokLink: e.target.value })}
                       className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
                     />
                   </div>
@@ -1234,12 +1404,21 @@ export default function AdminDashboard() {
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                   {announcements.map((ann) => (
                     <div key={ann.id} className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`h-2.5 w-2.5 rounded-full ${ann.isActive ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}></span>
-                          <h5 className="font-bold text-sm text-zinc-900 dark:text-white">{ann.title}</h5>
+                      <div className="flex items-center gap-4 flex-1">
+                        {ann.imageUrl && (
+                          <img 
+                            src={ann.imageUrl} 
+                            alt={ann.title} 
+                            className="w-16 h-12 object-cover rounded-lg bg-zinc-800 shrink-0 border border-zinc-200 dark:border-zinc-700"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2.5 w-2.5 rounded-full ${ann.isActive ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}></span>
+                            <h5 className="font-bold text-sm text-zinc-900 dark:text-white">{ann.title}</h5>
+                          </div>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-1">{ann.content}</p>
                         </div>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-1">{ann.content}</p>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
@@ -1280,9 +1459,11 @@ export default function AdminDashboard() {
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">تسجيل الخطب الأسبوعية والدروس وربطها بقناة يوتيوب المسجد الرسمية.</p>
             </div>
 
-            {/* Create Lecture Form */}
+            {/* Create/Edit Lecture Form */}
             <form onSubmit={handleAddLecture} className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
-              <h4 className="font-bold text-sm text-zinc-800 dark:text-zinc-200">إضافة درس/خطبة جديدة</h4>
+              <h4 className="font-bold text-sm text-zinc-800 dark:text-zinc-200">
+                {editingLectureId ? 'تعديل المحاضرة الحالية' : 'إضافة درس/خطبة جديدة'}
+              </h4>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1350,7 +1531,7 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">رابط صورة المعاينة المصغرة (اختياري، يتم جلبه تلقائياً)</label>
                   <input 
                     type="url" 
@@ -1359,6 +1540,52 @@ export default function AdminDashboard() {
                     onChange={e => setNewLec({ ...newLec, thumbnailUrl: e.target.value })}
                     className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">رابط الصوت MP3 مباشر (اختياري)</label>
+                  <input 
+                    type="url" 
+                    placeholder="رابط مباشر من أرشيف الإنترنت أو غيره..."
+                    value={newLec.mp3Url}
+                    onChange={e => setNewLec({ ...newLec, mp3Url: e.target.value })}
+                    className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                  />
+                </div>
+
+                {/* Categories Multi-Select Checkboxes */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-zinc-500 mb-2 dark:text-zinc-400">التصنيفات المرتبطة</label>
+                  {categories.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {categories.map((cat) => {
+                        const checked = newLec.categoryIds.includes(cat.id);
+                        return (
+                          <label key={cat.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer select-none transition-all ${
+                            checked 
+                              ? 'border-emerald-600 bg-emerald-50 text-emerald-800 dark:border-emerald-500 dark:bg-emerald-950/30 dark:text-emerald-400' 
+                              : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900'
+                          }`}>
+                            <input 
+                              type="checkbox"
+                              checked={checked}
+                              className="hidden"
+                              onChange={(e) => {
+                                const isChecked = e.target.checked;
+                                const updatedIds = isChecked
+                                  ? [...newLec.categoryIds, cat.id]
+                                  : newLec.categoryIds.filter(id => id !== cat.id);
+                                setNewLec({ ...newLec, categoryIds: updatedIds });
+                              }}
+                            />
+                            <span>{cat.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-400">لا توجد تصنيفات بعد. أضفها أولاً من تبويب إدارة التصنيفات.</p>
+                  )}
                 </div>
               </div>
 
@@ -1380,13 +1607,22 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              <div className="flex justify-end mt-2">
+              <div className="flex justify-end gap-2 mt-2">
+                {editingLectureId && (
+                  <button 
+                    type="button"
+                    onClick={handleCancelEditLecture}
+                    className="flex items-center gap-1 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-all"
+                  >
+                    <span>إلغاء التعديل</span>
+                  </button>
+                )}
                 <button 
                   type="submit" 
                   className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition-colors"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>إضافة المحاضرة</span>
+                  {editingLectureId ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                  <span>{editingLectureId ? 'تحديث المحاضرة' : 'إضافة المحاضرة'}</span>
                 </button>
               </div>
             </form>
@@ -1409,22 +1645,181 @@ export default function AdminDashboard() {
                         />
                         <div>
                           <h5 className="font-bold text-xs md:text-sm text-zinc-900 dark:text-white leading-snug line-clamp-1">{lec.title}</h5>
-                          <span className="text-[10px] text-zinc-400 font-medium block mt-1">بصوت/إلقاء: {lec.sheikh}</span>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <span className="text-[10px] text-zinc-400 font-medium">بصوت/إلقاء: {lec.sheikh}</span>
+                            {lec.categoryIds && lec.categoryIds.length > 0 && (
+                              <div className="flex gap-1">
+                                {lec.categoryIds.map(cId => {
+                                  const cat = categories.find(c => c.id === cId);
+                                  return cat ? (
+                                    <span key={cId} className="text-[9px] bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-bold">
+                                      {cat.name}
+                                    </span>
+                                  ) : null;
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleDeleteLecture(lec.id)}
-                        className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 transition-colors self-end sm:self-center"
-                        title="حذف الدرس"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <button
+                          onClick={() => handleEditLecture(lec)}
+                          className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 transition-colors"
+                          title="تعديل الدرس"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLecture(lec.id)}
+                          className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 transition-colors"
+                          title="حذف الدرس"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="p-8 text-center text-zinc-500">لا توجد محاضرات مسجلة بعد.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab Categories Manager */}
+        {activeTab === 'categories' && (
+          <div className="animate-fade-in flex flex-col gap-6">
+            <div>
+              <h3 className="text-xl font-extrabold text-zinc-900 dark:text-white">إدارة تصنيفات المحاضرات</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">تحديد وتعديل التصنيفات المختلفة لتسهيل البحث والفرز للمحاضرات والخطب.</p>
+            </div>
+
+            {/* Create Category Form */}
+            <form onSubmit={handleAddCategory} className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
+              <h4 className="font-bold text-sm text-zinc-800 dark:text-zinc-200">إضافة تصنيف جديد</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">اسم التصنيف</label>
+                  <input 
+                    type="text" 
+                    placeholder="مثال: خطب الجمعة، التلاوات..."
+                    value={newCategory.name}
+                    onChange={e => setNewCategory({ ...newCategory, name: e.target.value })}
+                    className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">الرابط اللطيف (Slug) - اختياري (يتم توليده تلقائياً)</label>
+                  <input 
+                    type="text" 
+                    placeholder="مثال: friday-sermons"
+                    value={newCategory.slug}
+                    onChange={e => setNewCategory({ ...newCategory, slug: e.target.value })}
+                    className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end mt-2">
+                <button 
+                  type="submit" 
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>إضافة التصنيف</span>
+                </button>
+              </div>
+            </form>
+
+            {/* List Categories */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 rounded-3xl overflow-hidden shadow-sm">
+              <div className="p-5 border-b border-zinc-150 dark:border-zinc-800/50 flex justify-between items-center">
+                <h4 className="font-bold text-sm text-zinc-800 dark:text-zinc-200">التصنيفات المتاحة حالياً</h4>
+                <span className="text-[10px] bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full font-bold dark:bg-zinc-800 dark:text-zinc-400">
+                  {categories.length} تصنيف
+                </span>
+              </div>
+
+              {categories.length > 0 ? (
+                <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                  {categories.map((cat) => (
+                    <div key={cat.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
+                      {editingCategoryId === cat.id ? (
+                        /* Inline Edit Form */
+                        <div className="flex-1 flex flex-col sm:flex-row gap-3 w-full">
+                          <div className="flex-1">
+                            <input 
+                              type="text" 
+                              value={editingCategoryName}
+                              onChange={e => setEditingCategoryName(e.target.value)}
+                              className="w-full rounded-xl border border-emerald-500 px-3 py-2 text-xs focus:outline-none dark:bg-zinc-950"
+                              placeholder="اسم التصنيف"
+                              required
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <input 
+                              type="text" 
+                              value={editingCategorySlug}
+                              onChange={e => setEditingCategorySlug(e.target.value)}
+                              className="w-full rounded-xl border border-emerald-500 px-3 py-2 text-xs focus:outline-none dark:bg-zinc-950"
+                              placeholder="الرابط اللطيف (Slug)"
+                            />
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleSaveCategory(cat.id)}
+                              className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition-all"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                              <span>حفظ</span>
+                            </button>
+                            <button
+                              onClick={() => setEditingCategoryId(null)}
+                              className="flex items-center gap-1 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-bold text-xs px-3 py-2 rounded-xl transition-all dark:bg-zinc-800 dark:text-zinc-300"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>إلغاء</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Standard View Row */
+                        <>
+                          <div className="flex-1">
+                            <h5 className="font-bold text-sm text-zinc-900 dark:text-white leading-snug">{cat.name}</h5>
+                            <span className="text-[10px] text-zinc-400 font-medium block mt-1">الرابط اللطيف (Slug): {cat.slug}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            <button
+                              onClick={() => handleEditCategory(cat)}
+                              className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 transition-colors"
+                              title="تعديل التصنيف"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCategory(cat.id)}
+                              className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 transition-colors"
+                              title="حذف التصنيف"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-zinc-500">لا توجد تصنيفات معرفة بعد.</div>
               )}
             </div>
           </div>
