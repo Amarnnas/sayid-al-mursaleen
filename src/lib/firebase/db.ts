@@ -329,7 +329,7 @@ export const getAnnouncements = async (onlyActive = false): Promise<Announcement
       querySnap.forEach((doc) => {
         list.push({ id: doc.id, ...doc.data() } as Announcement);
       });
-      if (list.length > 0) return list;
+      return list;
     } catch (e) {
       console.warn("Firebase failed, falling back to LocalStorage mock", e);
     }
@@ -403,7 +403,7 @@ export const getLectures = async (): Promise<Lecture[]> => {
       querySnap.forEach((doc) => {
         list.push({ id: doc.id, ...doc.data() } as Lecture);
       });
-      if (list.length > 0) return list;
+      return list;
     } catch (e) {
       console.warn("Firebase failed, falling back to LocalStorage mock", e);
     }
@@ -620,7 +620,7 @@ export const getCategories = async (): Promise<Category[]> => {
       querySnap.forEach((doc) => {
         list.push({ id: doc.id, ...doc.data() } as Category);
       });
-      if (list.length > 0) return list;
+      return list;
     } catch (e) {
       console.warn("Firebase failed, falling back to LocalStorage mock", e);
     }
