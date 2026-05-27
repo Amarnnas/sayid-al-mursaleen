@@ -73,5 +73,6 @@ export interface Admin {
   id: string; // doc ID is lowercase email
   email: string;
   role: 'super_admin' | 'admin';
+  password?: string;
   createdAt: number;
 }

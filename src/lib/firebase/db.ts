@@ -652,6 +652,7 @@ export const checkAdminEmail = async (email: string): Promise<Admin | null> => {
         id: cleanEmail,
         email: 'am2004arnasir@gmail.com',
         role: 'super_admin',
+        password: 'admin-password-2026',
         createdAt: serverTimestamp()
       };
       await withDbTimeout(setDoc(docRef, superAdmin));
@@ -660,6 +661,7 @@ export const checkAdminEmail = async (email: string): Promise<Admin | null> => {
         id: cleanEmail,
         email: 'am2004arnasir@gmail.com',
         role: 'super_admin',
+        password: 'admin-password-2026',
         createdAt: Date.now()
       } as Admin;
     }
@@ -685,6 +687,7 @@ export const getAdmins = async (): Promise<Admin[]> => {
       id: cleanEmail,
       email: 'am2004arnasir@gmail.com',
       role: 'super_admin',
+      password: 'admin-password-2026',
       createdAt: serverTimestamp()
     };
     await withDbTimeout(setDoc(doc(db, 'admins', cleanEmail), superAdmin));
@@ -692,13 +695,14 @@ export const getAdmins = async (): Promise<Admin[]> => {
       id: cleanEmail,
       email: 'am2004arnasir@gmail.com',
       role: 'super_admin',
+      password: 'admin-password-2026',
       createdAt: Date.now()
     } as Admin);
   }
   return list;
 };
 
-export const addAdmin = async (email: string, role: 'super_admin' | 'admin'): Promise<void> => {
+export const addAdmin = async (email: string, role: 'super_admin' | 'admin', password?: string): Promise<void> => {
   const cleanEmail = email.trim().toLowerCase();
   if (!isFirebaseConfigured()) {
     throw new Error("Firebase is not configured. Please set your credentials in .env.local.");
@@ -714,9 +718,20 @@ export const addAdmin = async (email: string, role: 'super_admin' | 'admin'): Pr
     id: cleanEmail,
     email: email.trim(),
     role,
+    password: password || '123456',
     createdAt: serverTimestamp()
   };
   await withDbTimeout(setDoc(docRef, newAdmin));
+};
+
+export const updateAdminPassword = async (email: string, newPassword: string): Promise<void> => {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase is not configured. Please set your credentials in .env.local.");
+  }
+  
+  const docRef = doc(db, 'admins', cleanEmail);
+  await withDbTimeout(updateDoc(docRef, { password: newPassword }));
 };
 
 export const deleteAdmin = async (email: string): Promise<void> => {

@@ -20,6 +20,7 @@ import {
   addAdmin,
   deleteAdmin,
   checkAdminEmail,
+  updateAdminPassword,
   isFirebaseConfigured,
   getCategories,
   addCategory,
@@ -130,12 +131,15 @@ export default function AdminDashboard() {
   const [newCategory, setNewCategory] = useState({ name: '', slug: '' });
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminRole, setNewAdminRole] = useState<'super_admin' | 'admin'>('admin');
+  const [newAdminPassword, setNewAdminPassword] = useState('123456');
 
   // --- Editing states ---
   const [editingLectureId, setEditingLectureId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const [editingCategorySlug, setEditingCategorySlug] = useState('');
+  const [editingAdminEmail, setEditingAdminEmail] = useState<string | null>(null);
+  const [editingAdminPassword, setEditingAdminPassword] = useState('');
 
   // --- Notification Banner States ---
   const [successMsg, setSuccessMsg] = useState('');
@@ -272,7 +276,7 @@ export default function AdminDashboard() {
     }
   }, [successMsg, errorMsg]);
 
-  // Handle Sign In - Firebase Auth only (no mock/demo)
+  // Handle Sign In - Firebase Auth with local Firestore-based password verification
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -289,14 +293,13 @@ export default function AdminDashboard() {
       return;
     }
     
-    // Real Firebase Auth Flow
     setIsLoggingIn(true);
     try {
-      // Check if email is in Firestore admins collection with timeout
+      // Check if email exists in Firestore admins collection
       const adminRecord = await withTimeout(
         checkAdminEmail(email),
         LOGIN_TIMEOUT_MS,
-        "فشلت عملية التحقق من حساب المشرف بسبب انتهاء مهلة الاتصال بالخادم. يرجى التحقق من الشبكة."
+        "فشلت عملية التحقق من حساب المشرف بسبب انتهاء مهلة الاتصال بالخادم."
       );
       
       if (!adminRecord) {
@@ -305,21 +308,48 @@ export default function AdminDashboard() {
         return;
       }
       
-      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      // If a password is set in Firestore, verify it first
+      if (adminRecord.password && adminRecord.password !== password) {
+        setLoginError('كلمة المرور المدخلة غير صحيحة.');
+        setIsLoggingIn(false);
+        return;
+      }
       
+      const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+      
+      // If passwords match (or if it is a legacy admin without a password yet),
+      // we log them in in Firebase Auth using a fixed system-secret password.
       try {
         await withTimeout(
-          signInWithEmailAndPassword(auth, email, password),
+          signInWithEmailAndPassword(auth, email, "MosqueAdminSecretPass2026!"),
           LOGIN_TIMEOUT_MS,
-          "انتهت مهلة تسجيل الدخول. يرجى التحقق من اتصال الإنترنت وحالة خادم Firebase."
+          "انتهت مهلة تسجيل الدخول. يرجى التحقق من اتصال الإنترنت."
         );
+        
+        // If they logged in successfully and didn't have a password set in Firestore, save it now!
+        if (!adminRecord.password) {
+          await updateAdminPassword(email, password);
+        }
         setSuccessMsg("تم تسجيل الدخول بنجاح!");
       } catch (err: any) {
-        console.warn("Sign-in failed with error code:", err.code);
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-email') {
-          setShowActivationConfirm(true);
+        console.warn("Firebase Auth sign-in failed, checking auto-provisioning...", err.code);
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+          // Auto-provision user in Firebase Auth using system password
+          try {
+            await withTimeout(
+              createUserWithEmailAndPassword(auth, email, "MosqueAdminSecretPass2026!"),
+              LOGIN_TIMEOUT_MS,
+              "انتهت مهلة تفعيل الحساب."
+            );
+            // Save entered password to Firestore
+            await updateAdminPassword(email, password);
+            setSuccessMsg("تم تفعيل حسابك وتسجيل الدخول بنجاح!");
+          } catch (createErr: any) {
+            console.error("Auto-provisioning failed:", createErr);
+            setLoginError('فشل تفعيل الحساب في نظام الحماية: ' + (createErr.message || 'خطأ غير معروف'));
+          }
         } else {
-          setLoginError(err.message || 'فشل تسجيل الدخول. تأكد من صحة البريد الإلكتروني وكلمة المرور.');
+          setLoginError(err.message || 'فشل تسجيل الدخول. تأكد من صحة الحساب وكلمة المرور.');
         }
       }
     } catch (e: any) {
@@ -373,47 +403,10 @@ export default function AdminDashboard() {
       console.error(e);
       if (e.code === 'auth/popup-closed-by-user') {
         setLoginError('تم إلغاء تسجيل الدخول.');
+      } else if (e.code === 'auth/unauthorized-domain') {
+        setLoginError('⚠️ نطاق التشغيل الحالي غير مصرح به في مشروع Firebase الخاص بك. للحل: يرجى الانتقال إلى Firebase Console -> Authentication -> Settings -> Authorized domains وإضافة النطاق الحالي (مثال: localhost أو عنوان IP الخاص بك).');
       } else {
         setLoginError(e.message || 'حدث خطأ أثناء تسجيل الدخول عبر Google.');
-      }
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  // First-Time account registration & password activation
-  const handleFirstTimeActivate = async () => {
-    const email = username.trim();
-    setLoginError('');
-    setShowActivationConfirm(false);
-    setIsLoggingIn(true);
-    
-    try {
-      const adminRecord = await withTimeout(
-        checkAdminEmail(email),
-        LOGIN_TIMEOUT_MS,
-        "انتهت مهلة التحقق من صلاحيات تفعيل الحساب."
-      );
-      
-      if (!adminRecord) {
-        setLoginError('عذراً، هذا البريد الإلكتروني غير مصرح له بالدخول.');
-        setIsLoggingIn(false);
-        return;
-      }
-      
-      const { createUserWithEmailAndPassword } = await import('firebase/auth');
-      await withTimeout(
-        createUserWithEmailAndPassword(auth, email, password),
-        LOGIN_TIMEOUT_MS,
-        "انتهت مهلة إنشاء وتفعيل الحساب. يرجى المحاولة مرة أخرى."
-      );
-      setSuccessMsg("تم تفعيل حسابك وتعيين كلمة المرور بنجاح!");
-    } catch (err: any) {
-      console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
-        setLoginError('هذا الحساب مفعل مسبقاً، كلمة المرور المدخلة غير صحيحة.');
-      } else {
-        setLoginError(err.message || 'تعذر تفعيل الحساب. يرجى إدخال كلمة مرور تتكون من 6 أحرف على الأقل.');
       }
     } finally {
       setIsLoggingIn(false);
@@ -444,15 +437,40 @@ export default function AdminDashboard() {
     }
     setLoading(true);
     try {
-      await addAdmin(newAdminEmail.trim(), newAdminRole);
+      await addAdmin(newAdminEmail.trim(), newAdminRole, newAdminPassword);
       setSuccessMsg("تم إضافة المشرف الجديد بنجاح!");
       setNewAdminEmail('');
+      setNewAdminPassword('123456');
       // Reload admins
       const updated = await getAdmins();
       setAdmins(updated);
     } catch (e: any) {
       console.error(e);
       setErrorMsg(e.message || "حدث خطأ أثناء إضافة المشرف.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save modified admin password
+  const handleSaveAdminPassword = async (email: string) => {
+    const trimmedPass = editingAdminPassword.trim();
+    if (trimmedPass.length < 6) {
+      setErrorMsg("كلمة المرور يجب أن تكون من 6 أحرف/أرقام على الأقل.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await updateAdminPassword(email, trimmedPass);
+      setSuccessMsg("تم تعديل كلمة مرور المشرف بنجاح!");
+      setEditingAdminEmail(null);
+      setEditingAdminPassword('');
+      // Reload admins
+      const updated = await getAdmins();
+      setAdmins(updated);
+    } catch (e: any) {
+      console.error(e);
+      setErrorMsg(e.message || "حدث خطأ أثناء تعديل كلمة المرور.");
     } finally {
       setLoading(false);
     }
@@ -872,32 +890,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {showActivationConfirm && (
-              <div className="flex flex-col gap-2.5 bg-emerald-50 text-emerald-800 p-4 rounded-2xl border border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/50 dark:text-emerald-400 text-xs">
-                <p className="font-bold flex items-center gap-1">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  هل تود تفعيل هذا الحساب وتعيين كلمة المرور؟
-                </p>
-                <p className="text-[10px] leading-relaxed">البريد الإلكتروني مصرح له بالدخول، ولكن لم يتم تفعيل حسابه بعد بكلمة مرور. هل تود استخدام كلمة المرور المدخلة لتفعيل حسابك الآن؟</p>
-                <div className="flex gap-2 mt-1">
-                  <button
-                    type="button"
-                    onClick={handleFirstTimeActivate}
-                    disabled={isLoggingIn}
-                    className="bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                  >
-                    نعم، تفعيل وتعيين كلمة المرور
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowActivationConfirm(false)}
-                    className="bg-zinc-200 text-zinc-700 font-bold px-3 py-1.5 rounded-lg hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </div>
-            )}
+
 
             <button 
               type="submit" 
@@ -1878,14 +1871,26 @@ export default function AdminDashboard() {
                 إضافة مشرف جديد للمسجد
               </h4>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">البريد الإلكتروني للمشرف (بريد Google أو بريد صالح للتفعيل)</label>
+                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">البريد الإلكتروني للمشرف</label>
                   <input 
                     type="email" 
                     placeholder="example@gmail.com"
                     value={newAdminEmail}
                     onChange={e => setNewAdminEmail(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">كلمة المرور الافتراضية</label>
+                  <input 
+                    type="text" 
+                    placeholder="123456"
+                    value={newAdminPassword}
+                    onChange={e => setNewAdminPassword(e.target.value)}
                     className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
                     required
                   />
@@ -1898,8 +1903,8 @@ export default function AdminDashboard() {
                     onChange={e => setNewAdminRole(e.target.value as any)}
                     className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
                   >
-                    <option value="admin">مشرف (إدارة المحتوى والإعلانات والمواقيت)</option>
-                    <option value="super_admin">مشرف عام (إدارة المشرفين + صلاحيات كاملة)</option>
+                    <option value="admin">مشرف (إدارة المحتوى والإعلانات)</option>
+                    <option value="super_admin">مشرف عام (Super Admin)</option>
                   </select>
                 </div>
               </div>
@@ -1941,35 +1946,90 @@ export default function AdminDashboard() {
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                   {admins.map((adm) => (
                     <div key={adm.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl ${adm.role === 'super_admin' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400'}`}>
-                          {adm.role === 'super_admin' ? <ShieldCheck className="w-5 h-5" /> : <Users className="w-5 h-5" />}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h5 className="font-bold text-sm text-zinc-900 dark:text-white leading-snug">{adm.email || 'بدون بريد'}</h5>
-                            {adm.email && currentAdminEmail && adm.email.toLowerCase() === currentAdminEmail.toLowerCase() && (
-                              <span className="text-[8px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-bold animate-pulse">أنت حالياً</span>
-                            )}
+                      {editingAdminEmail === adm.email ? (
+                        /* Inline Admin Password Editor */
+                        <div className="flex-1 flex flex-col sm:flex-row gap-3 w-full">
+                          <div className="flex-1">
+                            <span className="text-[10px] text-emerald-600 font-bold block mb-1">تعديل كلمة مرور المشرف: ({adm.email})</span>
+                            <input 
+                              type="text" 
+                              value={editingAdminPassword}
+                              onChange={e => setEditingAdminPassword(e.target.value)}
+                              className="w-full rounded-xl border border-emerald-500 px-3 py-2 text-xs focus:outline-none dark:bg-zinc-950 dark:text-white"
+                              placeholder="كلمة المرور الجديدة (6 أحرف/أرقام على الأقل)"
+                              required
+                            />
                           </div>
-                          <span className="text-[10px] text-zinc-400 font-medium block mt-1">
-                            الدور: {adm.role === 'super_admin' ? 'مشرف عام (Super Admin)' : 'مشرف (Admin)'}
-                          </span>
+                          <div className="flex gap-1 items-end">
+                            <button
+                              onClick={() => handleSaveAdminPassword(adm.email)}
+                              className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition-all"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                              <span>حفظ</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingAdminEmail(null);
+                                setEditingAdminPassword('');
+                              }}
+                              className="flex items-center gap-1 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-bold text-xs px-3 py-2 rounded-xl transition-all dark:bg-zinc-800 dark:text-zinc-300"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>إلغاء</span>
+                            </button>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        /* Standard View Row */
+                        <>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h5 className="font-bold text-sm text-zinc-900 dark:text-white leading-snug">{adm.email || 'بدون بريد'}</h5>
+                              {adm.email && currentAdminEmail && adm.email.toLowerCase() === currentAdminEmail.toLowerCase() && (
+                                <span className="text-[8px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-bold animate-pulse">أنت حالياً</span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                              <span className="text-[10px] text-zinc-400 font-medium">
+                                الدور: {adm.role === 'super_admin' ? 'مشرف عام (Super Admin)' : 'مشرف (Admin)'}
+                              </span>
+                              {currentAdminRole === 'super_admin' && (
+                                <span className="text-[10px] text-zinc-500 bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded-lg border border-zinc-200/40 dark:border-zinc-700/40 font-mono">
+                                  كلمة المرور: <span className="font-bold text-emerald-600 dark:text-emerald-400">{adm.password || '123456'}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
 
-                      <button
-                        onClick={() => handleDeleteAdmin(adm.email)}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          adm.email && currentAdminEmail && adm.email.toLowerCase() === currentAdminEmail.toLowerCase() 
-                            ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-600'
-                            : 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400'
-                        }`}
-                        title="حذف المشرف"
-                        disabled={!!(adm.email && currentAdminEmail && adm.email.toLowerCase() === currentAdminEmail.toLowerCase())}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            {currentAdminRole === 'super_admin' && (
+                              <button
+                                onClick={() => {
+                                  setEditingAdminEmail(adm.email);
+                                  setEditingAdminPassword(adm.password || '123456');
+                                }}
+                                className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 transition-colors"
+                                title="تعديل كلمة المرور"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteAdmin(adm.email)}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                adm.email && currentAdminEmail && adm.email.toLowerCase() === currentAdminEmail.toLowerCase() 
+                                  ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-600'
+                                  : 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400'
+                              }`}
+                              title="حذف المشرف"
+                              disabled={!!(adm.email && currentAdminEmail && adm.email.toLowerCase() === currentAdminEmail.toLowerCase())}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
