@@ -541,7 +541,7 @@ export default function AdminDashboard() {
       await addAnnouncement({
         title: newAnn.title,
         content: newAnn.content,
-        imageUrl: newAnn.imageUrl || undefined,
+        imageUrl: newAnn.imageUrl || "",
         createdAt: Date.now(),
         isActive: true
       });
@@ -673,7 +673,7 @@ export default function AdminDashboard() {
         youtubeUrl: newLec.youtubeUrl,
         description: finalDescription,
         thumbnailUrl: finalThumbnail,
-        mp3Url: newLec.mp3Url.trim() || undefined,
+        mp3Url: newLec.mp3Url.trim() || "",
         categoryIds: newLec.categoryIds
       };
       
