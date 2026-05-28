@@ -916,7 +916,7 @@ export default function AdminDashboard() {
 
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             <div>
-              <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">البريد الإلكتروني للمشرف</label>
+              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">البريد الإلكتروني للمشرف</label>
               <input 
                 type="email" 
                 placeholder="your-email@example.com"
@@ -929,7 +929,7 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">كلمة المرور</label>
+              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">كلمة المرور</label>
               <input 
                 type="password" 
                 placeholder="••••••••"
@@ -1032,37 +1032,37 @@ export default function AdminDashboard() {
       </div>
 
       {/* 2. Admin Sidebar Navigation */}
-      <aside className="w-full md:w-64 bg-zinc-900 text-zinc-300 flex flex-col shrink-0 border-l border-zinc-800">
+      <aside className="w-full md:w-64 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 flex flex-col shrink-0 border-l border-zinc-200 dark:border-zinc-800">
         {/* Sidebar Header */}
-        <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
+        <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img 
               src={general.logoUrl || '/logo.png'} 
               alt="شعار المسجد" 
-              className="h-8 w-8 object-contain rounded-lg bg-white/10 p-0.5"
+              className="h-8 w-8 object-contain rounded-lg bg-emerald-50 dark:bg-white/10 p-0.5"
             />
             <div>
-              <h2 className="font-extrabold text-sm text-white truncate max-w-[140px]">{general.mosqueName}</h2>
-              <span className="text-[10px] text-zinc-400 font-medium">لوحة المشرفين</span>
+              <h2 className="font-extrabold text-sm text-zinc-900 dark:text-white truncate max-w-[140px]">{general.mosqueName}</h2>
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">لوحة المشرفين</span>
             </div>
           </div>
         </div>
 
         {/* Logged-in Admin Profile Section */}
         {currentAdminEmail && (
-          <div className="p-4 mx-4 my-3 bg-zinc-950/40 border border-zinc-800/80 rounded-2xl flex flex-col gap-2.5">
+          <div className="p-4 mx-4 my-3 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl flex flex-col gap-2.5">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center text-emerald-400 font-bold shrink-0 shadow-inner">
+              <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold shrink-0 shadow-inner">
                 {currentAdminEmail.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-zinc-200 truncate" title={currentAdminEmail}>
+                <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate" title={currentAdminEmail}>
                   {currentAdminEmail}
                 </p>
                 <span className={`inline-block text-[9px] font-black px-2 py-0.5 rounded-full mt-0.5 ${
                   currentAdminRole === 'super_admin' 
-                    ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
-                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20' 
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'
                 }`}>
                   {currentAdminRole === 'super_admin' ? 'مشرف عام' : 'مشرف'}
                 </span>
@@ -1070,9 +1070,9 @@ export default function AdminDashboard() {
             </div>
             <button
               onClick={() => setIsChangingPasswordModalOpen(true)}
-              className="w-full flex items-center justify-center gap-1.5 bg-zinc-800 hover:bg-zinc-700/80 text-zinc-300 text-[10px] font-bold py-2 rounded-xl transition-all cursor-pointer shadow-sm"
+              className="w-full flex items-center justify-center gap-1.5 bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-300 text-[10px] font-bold py-2 rounded-xl transition-all cursor-pointer shadow-sm border border-zinc-200/50 dark:border-none"
             >
-              <Key className="w-3.5 h-3.5 text-emerald-500" />
+              <Key className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-500" />
               <span>تغيير كلمة المرور الخاصة بي</span>
             </button>
           </div>
@@ -1085,7 +1085,7 @@ export default function AdminDashboard() {
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === 'general' 
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10' 
-                : 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
             <Settings className="w-4 h-4" />
@@ -1097,7 +1097,7 @@ export default function AdminDashboard() {
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === 'prayer' 
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10' 
-                : 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
             <Clock className="w-4 h-4" />
@@ -1109,7 +1109,7 @@ export default function AdminDashboard() {
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === 'announcements' 
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10' 
-                : 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
             <Megaphone className="w-4 h-4" />
@@ -1121,7 +1121,7 @@ export default function AdminDashboard() {
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === 'lectures' 
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10' 
-                : 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
             <BookOpen className="w-4 h-4" />
@@ -1133,7 +1133,7 @@ export default function AdminDashboard() {
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === 'categories' 
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10' 
-                : 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
             <Tags className="w-4 h-4" />
@@ -1145,7 +1145,7 @@ export default function AdminDashboard() {
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === 'admins' 
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10' 
-                : 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -1154,10 +1154,10 @@ export default function AdminDashboard() {
         </nav>
 
         {/* Sidebar Footer Controls */}
-        <div className="p-4 border-t border-zinc-800 flex flex-col gap-2">
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-2">
           <Link 
             href="/"
-            className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2.5 rounded-xl text-xs font-semibold transition-colors"
+            className="flex items-center justify-center gap-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 py-2.5 rounded-xl text-xs font-semibold border border-zinc-200/50 dark:border-none transition-colors"
           >
             <Globe className="w-4 h-4" />
             <span>عرض موقع المسجد</span>
@@ -1165,7 +1165,7 @@ export default function AdminDashboard() {
 
           <button 
             onClick={handleLogout}
-            className="flex items-center justify-center gap-2 bg-red-950/30 hover:bg-red-950/60 text-red-400 py-2.5 rounded-xl text-xs font-semibold border border-red-900/30 transition-colors"
+            className="flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/60 text-red-700 dark:text-red-400 py-2.5 rounded-xl text-xs font-semibold border border-red-100 dark:border-red-900/30 transition-colors"
           >
             <LogOut className="w-4 h-4" />
             <span>تسجيل الخروج</span>
@@ -1199,7 +1199,7 @@ export default function AdminDashboard() {
             <form onSubmit={handleSaveGeneral} className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 rounded-3xl p-6 shadow-sm flex flex-col gap-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-2 dark:text-zinc-400">اسم المسجد الرسمي</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 dark:text-zinc-400">اسم المسجد الرسمي</label>
                   <input 
                     type="text" 
                     value={general.mosqueName}
@@ -1210,7 +1210,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-2 dark:text-zinc-400">هاتف التواصل</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 dark:text-zinc-400">هاتف التواصل</label>
                   <input 
                     type="text" 
                     value={general.contactPhone}
@@ -1221,7 +1221,7 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-500 mb-2 dark:text-zinc-400">الوصف التعريفي للمسجد</label>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 dark:text-zinc-400">الوصف التعريفي للمسجد</label>
                 <textarea 
                   rows={4}
                   value={general.description}
@@ -1236,7 +1236,7 @@ export default function AdminDashboard() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">قناة اليوتيوب الرسمية</label>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">قناة اليوتيوب الرسمية</label>
                     <input 
                       type="url" 
                       value={general.youtubeChannel}
@@ -1246,7 +1246,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">رابط مجموعة الواتساب</label>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">رابط مجموعة الواتساب</label>
                     <input 
                       type="url" 
                       value={general.whatsappLink}
@@ -1256,7 +1256,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">صفحة الفيسبوك</label>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">صفحة الفيسبوك</label>
                     <input 
                       type="url" 
                       value={general.facebookLink}
@@ -1266,7 +1266,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">رابط البث المباشر (يوتيوب/فيسبوك)</label>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">رابط البث المباشر (يوتيوب/فيسبوك)</label>
                     <input 
                       type="url" 
                       placeholder="رابط البث المباشر النشط"
@@ -1277,7 +1277,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">حساب تيك توك (TikTok)</label>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">حساب تيك توك (TikTok)</label>
                     <input 
                       type="url" 
                       placeholder="https://tiktok.com/@..."
@@ -1338,7 +1338,7 @@ export default function AdminDashboard() {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">خط العرض (Latitude)</label>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">خط العرض (Latitude)</label>
                       <input 
                         type="number" 
                         step="any"
@@ -1350,7 +1350,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">خط الطول (Longitude)</label>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">خط الطول (Longitude)</label>
                       <input 
                         type="number" 
                         step="any"
@@ -1362,7 +1362,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">طريقة الحساب الفلكي</label>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">طريقة الحساب الفلكي</label>
                       <select
                         value={prayer.calculationMethod}
                         onChange={e => setPrayer({ ...prayer, calculationMethod: e.target.value as any })}
@@ -1381,7 +1381,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">المذهب الفقهي (لصلاة العصر)</label>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">المذهب الفقهي (لصلاة العصر)</label>
                       <select
                         value={prayer.madhab}
                         onChange={e => setPrayer({ ...prayer, madhab: e.target.value as any })}
@@ -1479,7 +1479,7 @@ export default function AdminDashboard() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">عنوان الإعلان</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">عنوان الإعلان</label>
                   <input 
                     type="text" 
                     placeholder="مثال: صلاة عيد الفطر المبارك"
@@ -1491,7 +1491,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">رابط صورة توضيحية (اختياري)</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">رابط صورة توضيحية (اختياري)</label>
                   <input 
                     type="url" 
                     placeholder="رابط الصورة المباشر"
@@ -1503,7 +1503,7 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">نص الإعلان بالتفصيل</label>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">نص الإعلان بالتفصيل</label>
                 <textarea 
                   rows={3}
                   placeholder="اكتب تفاصيل الإعلان هنا للمصلين..."
@@ -1598,7 +1598,7 @@ export default function AdminDashboard() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">رابط الفيديو من اليوتيوب</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">رابط الفيديو من اليوتيوب</label>
                   <div className="flex gap-2">
                     <input 
                       type="url" 
@@ -1630,7 +1630,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">عنوان الخطبة/الدرس (اختياري، يتم جلبه تلقائياً)</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">عنوان الخطبة/الدرس (اختياري، يتم جلبه تلقائياً)</label>
                   <input 
                     type="text" 
                     placeholder="مثال: خطبة الجمعة - فضل طاعة الوالدين"
@@ -1641,7 +1641,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">اسم الشيخ/المحاضر</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">اسم الشيخ/المحاضر</label>
                   <input 
                     type="text" 
                     value={newLec.sheikh}
@@ -1652,7 +1652,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">ملاحظة/تفاصيل موجزة (اختياري، يتم جلبه تلقائياً)</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">ملاحظة/تفاصيل موجزة (اختياري، يتم جلبه تلقائياً)</label>
                   <input 
                     type="text" 
                     placeholder="اكتب ملاحظة أو وصف بسيط هنا..."
@@ -1663,7 +1663,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">رابط صورة المعاينة المصغرة (اختياري، يتم جلبه تلقائياً)</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">رابط صورة المعاينة المصغرة (اختياري، يتم جلبه تلقائياً)</label>
                   <input 
                     type="url" 
                     placeholder="سيتم ملء هذا الحقل تلقائياً عند إدخال رابط يوتيوب صالح"
@@ -1674,7 +1674,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">رابط الصوت MP3 مباشر (اختياري)</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">رابط الصوت MP3 مباشر (اختياري)</label>
                   <input 
                     type="url" 
                     placeholder="رابط مباشر من أرشيف الإنترنت أو غيره..."
@@ -1686,7 +1686,7 @@ export default function AdminDashboard() {
 
                 {/* Categories Multi-Select Checkboxes */}
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-zinc-500 mb-2 dark:text-zinc-400">التصنيفات المرتبطة</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 dark:text-zinc-400">التصنيفات المرتبطة</label>
                   {categories.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {categories.map((cat) => {
@@ -1834,7 +1834,7 @@ export default function AdminDashboard() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">اسم التصنيف</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">اسم التصنيف</label>
                   <input 
                     type="text" 
                     placeholder="مثال: خطب الجمعة، التلاوات..."
@@ -1846,7 +1846,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">الرابط اللطيف (Slug) - اختياري (يتم توليده تلقائياً)</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">الرابط اللطيف (Slug) - اختياري (يتم توليده تلقائياً)</label>
                   <input 
                     type="text" 
                     placeholder="مثال: friday-sermons"
@@ -1973,7 +1973,7 @@ export default function AdminDashboard() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">البريد الإلكتروني للمشرف</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">البريد الإلكتروني للمشرف</label>
                   <input 
                     type="email" 
                     placeholder="example@gmail.com"
@@ -1985,7 +1985,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">كلمة المرور الافتراضية</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">كلمة المرور الافتراضية</label>
                   <input 
                     type="text" 
                     placeholder="123456"
@@ -1997,7 +1997,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 mb-1.5 dark:text-zinc-400">صلاحية الوصول</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">صلاحية الوصول</label>
                   <select
                     value={newAdminRole}
                     onChange={e => setNewAdminRole(e.target.value as any)}

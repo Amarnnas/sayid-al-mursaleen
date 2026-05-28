@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://saed-al-mursaleen.web.app/sitemap.xml

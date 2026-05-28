@@ -29,6 +29,7 @@ import {
 import Link from 'next/link';
 import AccessibilityWidget from '../../../components/AccessibilityWidget';
 import ThemeToggle from '../../../components/ThemeToggle';
+import Toast from '../../../components/Toast';
 
 export default function LectureWatchPage() {
   const { slug } = useParams() as { slug: string };
@@ -41,6 +42,7 @@ export default function LectureWatchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     const loadPageData = async () => {
@@ -129,15 +131,25 @@ export default function LectureWatchPage() {
   const handleDownloadMp3 = async () => {
     if (!lecture || !lecture.mp3Url) return;
     setDownloading(true);
+    setToast(null);
     try {
       await incrementLectureDownloads(lecture.id);
       // Increment local count
       setLecture(prev => prev ? { ...prev, downloads: (prev.downloads || 0) + 1 } : null);
       
-      // Start download
-      window.open(lecture.mp3Url, '_blank');
+      // Start direct proxy download
+      const safeFilename = `${lecture.title.replace(/[\\/:*?"<>|]/g, '')}.mp3`;
+      const downloadUrl = `/api/download?url=${encodeURIComponent(lecture.mp3Url)}&filename=${encodeURIComponent(safeFilename)}`;
+      
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', safeFilename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (e) {
       console.error(e);
+      setToast({ message: 'تعذر تحميل الملف', type: 'error' });
     } finally {
       setDownloading(false);
     }
@@ -398,6 +410,13 @@ export default function LectureWatchPage() {
 
       {/* Floating Accessibility Controls for Elderly */}
       <AccessibilityWidget />
+
+      {/* Toast Overlay */}
+      {toast && (
+        <div className="fixed bottom-5 left-5 z-50 max-w-sm w-full px-4 md:px-0">
+          <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+        </div>
+      )}
     </div>
   );
 }

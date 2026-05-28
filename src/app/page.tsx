@@ -317,7 +317,7 @@ function HomeContent() {
           </svg>
         </div>
 
-        <div className="relative z-10 mx-auto max-w-4xl px-4 text-center">
+        <div className="relative z-10 mx-auto max-w-4xl px-4 flex flex-col items-center justify-center text-center">
           <div className="mb-6 inline-block">
             <div className="relative">
               <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-2xl scale-150 animate-pulse-slow"></div>
