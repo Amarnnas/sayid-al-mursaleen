@@ -21,8 +21,6 @@ const isBrowser = typeof window !== 'undefined';
 
 // Check if Firebase is actually configured with real keys
 export const isFirebaseConfigured = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   

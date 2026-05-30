@@ -10,8 +10,10 @@ saed_web/
 │   │   ├── page.tsx            # Homepage: header, hero, prayer, announcements, lectures, contact, footer, accessibility
 │   │   ├── globals.css         # Tailwind v4, custom CSS (high-contrast, scrollbar, animations)
 │   │   ├── admin/page.tsx      # Admin dashboard (general/prayer/announcements/lectures/categories/admins CRUD)
-│   │   ├── lectures/[slug]/page.tsx  # Single lecture detail page
-│   │   ├── api/download/route.ts     # MP3 download proxy API
+│   │   ├── lectures/[slug]/page.tsx            # Server: metadata + JSON-LD + renders client component
+│   │   ├── lectures/[slug]/client-page.tsx      # Client: all interactive UI + share button
+│   │   ├── lectures/[slug]/opengraph-image.tsx   # OG image generator (ImageResponse + Cairo)
+│   │   ├── api/download/route.ts                # MP3 download proxy API
 │   │   └── sitemap.xml/route.ts      # Dynamic sitemap
 │   ├── components/
 │   │   ├── AccessibilityWidget.tsx    # Floating accessibility (font size, high contrast, light/dark/system)
@@ -27,6 +29,12 @@ saed_web/
 │       ├── prayerTimes.ts      # Adhan prayer time calculation utilities
 │       └── types.ts            # TypeScript interfaces
 ├── public/
+│   ├── fonts/
+│   │   ├── Cairo-Regular.ttf
+│   │   ├── Cairo-Bold.ttf
+│   │   └── Cairo-Black.ttf
+│   ├── logo.png
+│   └── robots.txt
 ├── next.config.ts
 ├── package.json
 ├── tsconfig.json
@@ -56,6 +64,10 @@ saed_web/
 | إمكانية الوصول (كبار السن) | `AccessibilityWidget.tsx` (حجم الخط، تباين عالي) | ✅ |
 | بيانات منظمة (Schema.org) | `layout.tsx` JSON-LD + `page.tsx` (category schema) | ✅ |
 | تحسين محركات البحث (SEO) | `layout.tsx` meta tags, sitemap, internal links | ✅ |
+| **صور المشاركة الديناميكية OG** | `lectures/[slug]/opengraph-image.tsx` (ImageResponse + خط Cairo) | ✅ جديد |
+| **Open Graph / Twitter Metadata** | `lectures/[slug]/page.tsx` (generateMetadata) | ✅ جديد |
+| **مشاركة واتساب + Web Share API** | `lectures/[slug]/client-page.tsx` (زر مشاركة مع fallback) | ✅ جديد |
+| **البيانات المنظمة (Structured Data)** | `lectures/[slug]/page.tsx` (VideoObject/AudioObject JSON-LD) | ✅ جديد |
 | **التواصل عبر البريد الإلكتروني** | قسم في `page.tsx` (footer), حقل في `GeneralSettings` | ✅ جديد |
 | **أيقونات التواصل فقط في الموبايل** | `page.tsx` (إخفاء النصوص في أزرار السوشيال ميديا) | ✅ جديد |
 | **هيدر مبسط للموبايل** | `page.tsx` (إخفاء النص الفرعي للمسجد + النصوص في الأزرار) | ✅ جديد |
@@ -69,6 +81,7 @@ saed_web/
 
 ## التعديلات الجراحية الأخيرة
 
+- **تحسين مشاركة المحاضرات**: صور OG ديناميكية (1200×630) + بطاقة معاينة احترافية + أزرار مشاركة.
 - **إصلاح خطأ حذف الإعلانات**: `db.ts` — إزالة التجاوز (fallback) إلى LocalStorage عند فشل Firebase في عمليات الكتابة (إضافة/تحديث/حذف). كان التجاوز يستخدم بيانات قديمة لا تتطابق مع معرفات Firebase مما يجعل الحذف بلا تأثير. الآن تنتشر الأخطاء إلى المتصل مباشرة.
 - **تحسين معالجة الأخطاء**: `admin/page.tsx` — إظهار رسالة خطأ للمستخدم عند فشل الحذف أو الإضافة. 
 
