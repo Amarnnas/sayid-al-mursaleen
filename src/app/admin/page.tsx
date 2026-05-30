@@ -129,6 +129,7 @@ export default function AdminDashboard() {
     description: '', 
     thumbnailUrl: '', 
     mp3Url: '',
+    slug: '',
     categoryIds: [] as string[]
   });
   const [newCategory, setNewCategory] = useState({ name: '', slug: '', sortOrder: 999 });
@@ -734,6 +735,7 @@ export default function AdminDashboard() {
         description: finalDescription,
         thumbnailUrl: finalThumbnail,
         mp3Url: newLec.mp3Url.trim() || "",
+        slug: newLec.slug.trim() || undefined,
         categoryIds: newLec.categoryIds
       };
       
@@ -756,6 +758,7 @@ export default function AdminDashboard() {
         description: '', 
         thumbnailUrl: '', 
         mp3Url: '',
+        slug: '',
         categoryIds: []
       });
       
@@ -779,6 +782,7 @@ export default function AdminDashboard() {
       description: lec.description,
       thumbnailUrl: lec.thumbnailUrl || '',
       mp3Url: lec.mp3Url || '',
+      slug: lec.slug || '',
       categoryIds: lec.categoryIds || []
     });
     setActiveTab('lectures');
@@ -793,6 +797,7 @@ export default function AdminDashboard() {
       description: '',
       thumbnailUrl: '',
       mp3Url: '',
+      slug: '',
       categoryIds: []
     });
   };
@@ -1698,6 +1703,30 @@ export default function AdminDashboard() {
                     onChange={e => setNewLec({ ...newLec, mp3Url: e.target.value })}
                     className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">الرابط المختصر (Slug - اختياري)</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="مثال: khisal-al-khair"
+                      value={newLec.slug}
+                      onChange={e => setNewLec({ ...newLec, slug: e.target.value })}
+                      className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 ltr:text-left rtl:text-right font-mono"
+                      dir="ltr"
+                    />
+                    {newLec.slug && (
+                      <button
+                        type="button"
+                        onClick={() => setNewLec({ ...newLec, slug: '' })}
+                        className="shrink-0 bg-zinc-200 hover:bg-zinc-300 text-zinc-600 font-bold text-xs px-3 py-2 rounded-xl transition-all dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-400"
+                      >
+                        إعادة تعيين
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-[9px] text-zinc-400 mt-1 block">اتركه فارغاً ليتم إنشاؤه تلقائياً من العنوان. slug/lectures/khisal-al-khair</span>
                 </div>
 
                 {/* Categories Multi-Select Checkboxes */}

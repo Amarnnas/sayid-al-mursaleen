@@ -23,7 +23,9 @@ import {
   Compass,
   Loader2,
   AlertCircle,
-  Share2
+  Share2,
+  Copy,
+  Check
 } from 'lucide-react'
 import Link from 'next/link'
 import AccessibilityWidget from '../../../components/AccessibilityWidget'
@@ -57,6 +59,7 @@ export default function LectureDetailClient({
   const [error, setError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [copySuccess, setCopySuccess] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   const initialLoadDone = useRef(false)
@@ -179,7 +182,7 @@ export default function LectureDetailClient({
     setSharing(true)
     try {
       const shareUrl = window.location.href
-      const shareText = `🎙 ${lecture.title}\n👤 ${lecture.sheikh}\n📖 من منصة مسجد سيد المرسلين\n🔗 ${shareUrl}`
+      const shareText = `🎙 ${lecture.title}\n👤 ${lecture.sheikh}\n🔗 ${shareUrl}`
 
       if (typeof navigator !== 'undefined' && 'share' in navigator) {
         await navigator.share({
@@ -195,12 +198,24 @@ export default function LectureDetailClient({
       if (e instanceof DOMException && e.name === 'AbortError') return
       if (!lecture) return
       const shareUrl = window.location.href
-      const shareText = `🎙 ${lecture.title}\n👤 ${lecture.sheikh}\n📖 من منصة مسجد سيد المرسلين\n🔗 ${shareUrl}`
+      const shareText = `🎙 ${lecture.title}\n👤 ${lecture.sheikh}\n🔗 ${shareUrl}`
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`
       window.open(whatsappUrl, '_blank', 'noopener')
     } finally {
       setSharing(false)
     }
+  }
+
+  const handleCopyLink = () => {
+    if (!lecture) return
+    const shareUrl = window.location.href
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopySuccess(true)
+      setToast({ message: 'تم نسخ الرابط!', type: 'success' })
+      setTimeout(() => setCopySuccess(false), 2000)
+    }).catch(() => {
+      setToast({ message: 'تعذر نسخ الرابط', type: 'error' })
+    })
   }
 
   if (loading) {
@@ -393,6 +408,18 @@ export default function LectureDetailClient({
                     <span className="text-xs font-normal opacity-85">({lecture.downloads || 0} تحميل)</span>
                   </button>
                 )}
+
+                <button
+                  onClick={handleCopyLink}
+                  className="flex items-center justify-center gap-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 font-bold py-3.5 px-4 rounded-2xl shadow-sm active:scale-99 transition-all cursor-pointer text-sm"
+                  title="نسخ الرابط"
+                >
+                  {copySuccess ? (
+                    <Check className="w-5 h-5 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-5 h-5" />
+                  )}
+                </button>
 
                 <button
                   onClick={handleShare}

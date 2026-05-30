@@ -72,14 +72,30 @@ export const getYouTubeThumbnail = (url: string): string => {
   return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : '';
 };
 
-// Slug generation utility (handles Arabic and English)
+// Arabic→Latin transliteration map for slug generation
+const arabicToLatin: Record<string, string> = {
+  'ا': 'a', 'أ': 'a', 'إ': 'a', 'آ': 'a', 'ء': 'a',
+  'ب': 'b', 'ت': 't', 'ث': 'th', 'ج': 'j', 'ح': 'h',
+  'خ': 'kh', 'د': 'd', 'ذ': 'dh', 'ر': 'r', 'ز': 'z',
+  'س': 's', 'ش': 'sh', 'ص': 's', 'ض': 'd', 'ط': 't',
+  'ظ': 'z', 'ع': 'a', 'غ': 'gh', 'ف': 'f', 'ق': 'q',
+  'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n', 'ه': 'h',
+  'و': 'w', 'ي': 'y', 'ئ': 'a', 'ؤ': 'w', 'ة': 'h',
+  'ى': 'a', ' ': '-', '_': '-'
+};
+
 export const generateSlug = (text: string): string => {
-  return text
+  const slug = text
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9\u0600-\u06FF\s-]/g, '') // Keep alphanumeric, Arabic, spaces and hyphens
-    .replace(/\s+/g, '-') // spaces to hyphens
-    .replace(/-+/g, '-'); // collapse multiple hyphens
+    .split('')
+    .map(ch => arabicToLatin[ch] || ch)
+    .join('')
+    .replace(/[^a-z0-9-]/g, '')    // Remove anything not alphanumeric or hyphen
+    .replace(/-+/g, '-')            // Collapse multiple hyphens
+    .replace(/^-+|-+$/g, '');       // Trim leading/trailing hyphens
+
+  return slug.slice(0, 60);
 };
 
 // --- DEFAULT SEED DATA ---
@@ -484,7 +500,7 @@ export const addLecture = async (lec: Omit<Lecture, 'id'>): Promise<string> => {
   }
   
   const newId = `lec-${Date.now()}`;
-  const slug = generateSlug(lec.title) || newId;
+  const slug = lec.slug || generateSlug(lec.title) || newId;
   const completeLec: Lecture = {
     ...lec,
     id: newId,
@@ -527,7 +543,7 @@ export const updateLecture = async (id: string, updates: Partial<Lecture>): Prom
   if (updates.youtubeUrl && !updates.thumbnailUrl) {
     cleanUpdates.thumbnailUrl = getYouTubeThumbnail(updates.youtubeUrl);
   }
-  if (updates.title) {
+  if (updates.title && !updates.slug) {
     cleanUpdates.slug = generateSlug(updates.title);
   }
   
