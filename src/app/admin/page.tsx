@@ -611,7 +611,7 @@ export default function AdminDashboard() {
       setAnnouncements(updated);
     } catch (e) {
       console.error(e);
-      setErrorMsg("حدث خطأ أثناء إضافة الإعلان.");
+      setErrorMsg("فشل إضافة الإعلان. يرجى المحاولة مرة أخرى.");
     }
   };
 
@@ -636,6 +636,7 @@ export default function AdminDashboard() {
       setSuccessMsg("تم حذف الإعلان.");
     } catch (e) {
       console.error(e);
+      setErrorMsg("فشل حذف الإعلان. يرجى المحاولة مرة أخرى.");
     }
   };
 

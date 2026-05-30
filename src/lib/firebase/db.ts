@@ -343,18 +343,13 @@ export const getAnnouncements = async (onlyActive = false): Promise<Announcement
 };
 
 export const addAnnouncement = async (ann: Omit<Announcement, 'id'>): Promise<string> => {
-  const newId = `ann-${Date.now()}`;
-  const fullAnn: Announcement = { ...ann, id: newId };
-  
   if (isFirebaseConfigured()) {
-    try {
-      const docRef = await withDbTimeout(addDoc(collection(db, 'announcements'), ann));
-      return docRef.id;
-    } catch (e) {
-      console.error("Firebase addAnnouncement error:", e);
-    }
+    const docRef = await withDbTimeout(addDoc(collection(db, 'announcements'), ann));
+    return docRef.id;
   }
   
+  const newId = `ann-${Date.now()}`;
+  const fullAnn: Announcement = { ...ann, id: newId };
   const current: Announcement[] = mockDb.get('announcements', defaultAnnouncements);
   current.push(fullAnn);
   mockDb.set('announcements', current);
@@ -363,13 +358,9 @@ export const addAnnouncement = async (ann: Omit<Announcement, 'id'>): Promise<st
 
 export const updateAnnouncement = async (id: string, updates: Partial<Announcement>): Promise<void> => {
   if (isFirebaseConfigured()) {
-    try {
-      const docRef = doc(db, 'announcements', id);
-      await withDbTimeout(updateDoc(docRef, updates));
-      return;
-    } catch (e) {
-      console.error("Firebase updateAnnouncement error:", e);
-    }
+    const docRef = doc(db, 'announcements', id);
+    await withDbTimeout(updateDoc(docRef, updates));
+    return;
   }
   
   const current: Announcement[] = mockDb.get('announcements', defaultAnnouncements);
@@ -379,13 +370,9 @@ export const updateAnnouncement = async (id: string, updates: Partial<Announceme
 
 export const deleteAnnouncement = async (id: string): Promise<void> => {
   if (isFirebaseConfigured()) {
-    try {
-      const docRef = doc(db, 'announcements', id);
-      await withDbTimeout(deleteDoc(docRef));
-      return;
-    } catch (e) {
-      console.error("Firebase deleteAnnouncement error:", e);
-    }
+    const docRef = doc(db, 'announcements', id);
+    await withDbTimeout(deleteDoc(docRef));
+    return;
   }
   
   const current: Announcement[] = mockDb.get('announcements', defaultAnnouncements);
