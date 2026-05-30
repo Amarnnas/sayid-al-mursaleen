@@ -8,7 +8,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lectures = await getLectures().catch(() => []);
 
   const lectureUrls = lectures.map((lec) => ({
-    url: `${baseUrl}/lectures/${lec.slug || lec.id}`,
+    url: `${baseUrl}/l/${lec.shortSlug || lec.slug || lec.id}`,
     lastModified: new Date(lec.createdAt || Date.now()),
     changeFrequency: 'monthly' as const,
     priority: 0.8,

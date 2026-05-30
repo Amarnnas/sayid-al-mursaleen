@@ -26,7 +26,7 @@ export default function LectureCard({ lecture, categoryNames }: LectureCardProps
   };
 
   const videoId = getYouTubeId(lecture.youtubeUrl);
-  const targetHref = `/lectures/${lecture.slug || lecture.id}`;
+  const targetHref = `/l/${lecture.shortSlug || lecture.slug || lecture.id}`;
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.preventDefault();

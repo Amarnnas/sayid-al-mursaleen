@@ -130,6 +130,7 @@ export default function AdminDashboard() {
     thumbnailUrl: '', 
     mp3Url: '',
     slug: '',
+    shortSlug: '',
     categoryIds: [] as string[]
   });
   const [newCategory, setNewCategory] = useState({ name: '', slug: '', sortOrder: 999 });
@@ -736,6 +737,7 @@ export default function AdminDashboard() {
         thumbnailUrl: finalThumbnail,
         mp3Url: newLec.mp3Url.trim() || "",
         slug: newLec.slug.trim() || undefined,
+        shortSlug: newLec.shortSlug.trim() || undefined,
         categoryIds: newLec.categoryIds
       };
       
@@ -759,6 +761,7 @@ export default function AdminDashboard() {
         thumbnailUrl: '', 
         mp3Url: '',
         slug: '',
+        shortSlug: '',
         categoryIds: []
       });
       
@@ -783,6 +786,7 @@ export default function AdminDashboard() {
       thumbnailUrl: lec.thumbnailUrl || '',
       mp3Url: lec.mp3Url || '',
       slug: lec.slug || '',
+      shortSlug: lec.shortSlug || '',
       categoryIds: lec.categoryIds || []
     });
     setActiveTab('lectures');
@@ -798,6 +802,7 @@ export default function AdminDashboard() {
       thumbnailUrl: '',
       mp3Url: '',
       slug: '',
+      shortSlug: '',
       categoryIds: []
     });
   };
@@ -1726,7 +1731,31 @@ export default function AdminDashboard() {
                       </button>
                     )}
                   </div>
-                  <span className="text-[9px] text-zinc-400 mt-1 block">اتركه فارغاً ليتم إنشاؤه تلقائياً من العنوان. slug/lectures/khisal-al-khair</span>
+                  <span className="text-[9px] text-zinc-400 mt-1 block">اتركه فارغاً ليتم إنشاؤه تلقائياً. /lectures/khisal-al-khair</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">الرابط القصير Short Link (اختياري)</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="مثال: khisal-al-khair أو a8x2k9"
+                      value={newLec.shortSlug}
+                      onChange={e => setNewLec({ ...newLec, shortSlug: e.target.value })}
+                      className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 ltr:text-left rtl:text-right font-mono"
+                      dir="ltr"
+                    />
+                    {newLec.shortSlug && (
+                      <button
+                        type="button"
+                        onClick={() => setNewLec({ ...newLec, shortSlug: '' })}
+                        className="shrink-0 bg-zinc-200 hover:bg-zinc-300 text-zinc-600 font-bold text-xs px-3 py-2 rounded-xl transition-all dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-400"
+                      >
+                        إعادة تعيين
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-[9px] text-zinc-400 mt-1 block">اتركه فارغاً ليتم إنشاؤه تلقائياً. /l/khisal-al-khair</span>
                 </div>
 
                 {/* Categories Multi-Select Checkboxes */}

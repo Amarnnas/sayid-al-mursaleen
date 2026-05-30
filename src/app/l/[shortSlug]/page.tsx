@@ -1,15 +1,14 @@
 import type { Metadata } from 'next'
-import { permanentRedirect } from 'next/navigation'
 import { getLectureBySlugOrId, getLectures, getCategories, getGeneralSettings, getPrayerSettings, getYouTubeThumbnail } from '../../../lib/firebase/db'
-import LectureDetailClient from './client-page'
+import LectureDetailClient from '../../lectures/[slug]/client-page'
 
 type Props = {
-  params: Promise<{ slug: string }>
+  params: Promise<{ shortSlug: string }>
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params
-  const decodedSlug = decodeURIComponent(slug)
+  const { shortSlug } = await params
+  const decodedSlug = decodeURIComponent(shortSlug)
   const lecture = await getLectureBySlugOrId(decodedSlug)
 
   if (!lecture) {
@@ -43,9 +42,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default async function LecturePage({ params }: Props) {
-  const { slug } = await params
-  const decodedSlug = decodeURIComponent(slug)
+export default async function ShortLecturePage({ params }: Props) {
+  const { shortSlug } = await params
+  const decodedSlug = decodeURIComponent(shortSlug)
 
   const [lecture, general, allLectures, cats, pray] = await Promise.all([
     getLectureBySlugOrId(decodedSlug),
@@ -54,11 +53,6 @@ export default async function LecturePage({ params }: Props) {
     getCategories().catch(() => []),
     getPrayerSettings().catch(() => null),
   ])
-
-  // 308 redirect to /l/shortSlug if the incoming slug doesn't match the lecture's short slug
-  if (lecture?.shortSlug && decodedSlug !== lecture.shortSlug) {
-    permanentRedirect(`/l/${lecture.shortSlug}`)
-  }
 
   let structuredData = null
   if (lecture) {

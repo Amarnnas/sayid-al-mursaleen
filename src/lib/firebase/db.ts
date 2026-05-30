@@ -98,6 +98,11 @@ export const generateSlug = (text: string): string => {
   return slug.slice(0, 60);
 };
 
+// Generate a short (6-char) random ID for short links
+export const generateShortSlug = (): string => {
+  return Math.random().toString(36).substring(2, 8);
+};
+
 // --- DEFAULT SEED DATA ---
 const defaultGeneralSettings: GeneralSettings = {
   mosqueName: "مسجد سيد المرسلين",
@@ -148,6 +153,7 @@ const defaultLectures: Lecture[] = [
     thumbnailUrl: "https://img.youtube.com/vi/Vs2ibIIJrSk/hqdefault.jpg",
     categoryIds: ["cat-1"],
     slug: "friday-sermon-lecture-1",
+    shortSlug: "friday-sermon-1",
     views: 142,
     downloads: 12,
     createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000 // 3 days ago
@@ -161,6 +167,7 @@ const defaultLectures: Lecture[] = [
     thumbnailUrl: "https://img.youtube.com/vi/sLNkh_Ulv4g/hqdefault.jpg",
     categoryIds: ["cat-1", "cat-3"],
     slug: "excellent-friday-sermons-2",
+    shortSlug: "excellent-sermon-2",
     views: 89,
     downloads: 5,
     createdAt: Date.now() - 7 * 24 * 60 * 60 * 1000 // 7 days ago
@@ -174,6 +181,7 @@ const defaultLectures: Lecture[] = [
     thumbnailUrl: "https://img.youtube.com/vi/2vn5Gp2gsXc/hqdefault.jpg",
     categoryIds: ["cat-3"],
     slug: "weekly-lesson-creed-3",
+    shortSlug: "weekly-creed-3",
     views: 65,
     downloads: 2,
     createdAt: Date.now() - 12 * 24 * 60 * 60 * 1000 // 12 days ago
@@ -187,6 +195,7 @@ const defaultLectures: Lecture[] = [
     thumbnailUrl: "https://img.youtube.com/vi/vo48qB1gSxI/hqdefault.jpg",
     categoryIds: ["cat-2", "cat-6"],
     slug: "touching-recitation-mosque-4",
+    shortSlug: "touching-recitation-4",
     views: 204,
     downloads: 48,
     createdAt: Date.now() - 15 * 24 * 60 * 60 * 1000 // 15 days ago
@@ -439,12 +448,15 @@ export const getLectureBySlugOrId = async (slugOrId: string): Promise<Lecture | 
         const data = doc.data() as Lecture;
         const lId = doc.id;
         const lSlug = data.slug || '';
+        const lShort = data.shortSlug || '';
         
         if (
           lId === raw || 
           lId === decoded ||
           lSlug === raw || 
           lSlug === decoded ||
+          lShort === raw ||
+          lShort === decoded ||
           decodeURIComponent(lSlug) === decoded ||
           lSlug.toLowerCase() === decoded.toLowerCase()
         ) {
@@ -462,12 +474,15 @@ export const getLectureBySlugOrId = async (slugOrId: string): Promise<Lecture | 
   const all: Lecture[] = mockDb.get('lectures', defaultLectures);
   const found = all.find(l => {
     const lSlug = l.slug || '';
+    const lShort = l.shortSlug || '';
     const lId = l.id || '';
     return (
       lId === raw || 
       lId === decoded ||
       lSlug === raw || 
       lSlug === decoded ||
+      lShort === raw ||
+      lShort === decoded ||
       decodeURIComponent(lSlug) === decoded ||
       lSlug.toLowerCase() === decoded.toLowerCase()
     );
@@ -501,10 +516,23 @@ export const addLecture = async (lec: Omit<Lecture, 'id'>): Promise<string> => {
   
   const newId = `lec-${Date.now()}`;
   const slug = lec.slug || generateSlug(lec.title) || newId;
+  
+  // Generate shortSlug: use provided, or transliterate + truncate, or random 6-char
+  let shortSlug = lec.shortSlug;
+  if (!shortSlug) {
+    const generated = generateSlug(lec.title);
+    if (generated.length >= 3 && generated.length <= 20) {
+      shortSlug = generated;
+    } else {
+      shortSlug = generateShortSlug();
+    }
+  }
+  
   const completeLec: Lecture = {
     ...lec,
     id: newId,
     slug,
+    shortSlug,
     views: 0,
     downloads: 0,
     thumbnailUrl: lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl)
@@ -515,6 +543,7 @@ export const addLecture = async (lec: Omit<Lecture, 'id'>): Promise<string> => {
       const docRef = await withDbTimeout(addDoc(collection(db, 'lectures'), {
         ...lec,
         slug,
+        shortSlug,
         views: 0,
         downloads: 0,
         thumbnailUrl: lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl)
@@ -545,6 +574,12 @@ export const updateLecture = async (id: string, updates: Partial<Lecture>): Prom
   }
   if (updates.title && !updates.slug) {
     cleanUpdates.slug = generateSlug(updates.title);
+  }
+  if (updates.title && !updates.shortSlug) {
+    const generated = generateSlug(updates.title);
+    cleanUpdates.shortSlug = (generated.length >= 3 && generated.length <= 20)
+      ? generated
+      : generateShortSlug();
   }
   
   if (isFirebaseConfigured()) {

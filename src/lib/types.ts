@@ -16,6 +16,7 @@ export interface Lecture {
   categoryIds?: string[]; // IDs of associated categories
   mp3Url?: string; // external direct audio link
   slug?: string; // slug for clean URLs
+  shortSlug?: string; // short slug for /l/ URLs (auto-generated)
   views?: number; // total views count
   downloads?: number; // total downloads count
   createdAt: number; // millisecond timestamp

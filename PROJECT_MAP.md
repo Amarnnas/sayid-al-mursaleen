@@ -54,41 +54,53 @@ saed_web/
 |--------|---------|--------|
 | مواقيت الصلاة الحية | `PrayerTimesCard.tsx`, `prayerTimes.ts` | ✅ |
 | الإعلانات | `AnnouncementCard.tsx`, إدارة في `admin/page.tsx` | ✅ |
-| المحاضرات والخطب | `LectureCard.tsx`, صفحة تفاصيل `lectures/[slug]/page.tsx` | ✅ |
+| المحاضرات والخطب | `LectureCard.tsx`, `lectures/[slug]/page.tsx`, `l/[shortSlug]/page.tsx` | ✅ |
+| نظام Short Links | `l/[shortSlug]/page.tsx`, `shortSlug` في `db.ts` و `types.ts` | ✅ جديد |
+| إعادة توجيه الروابط القديمة | `lectures/[slug]/page.tsx` (permanentRedirect 308) | ✅ جديد |
 | التصنيفات | تصفية وفرز في `page.tsx`, إدارة في `admin/page.tsx` | ✅ |
-| **تصفح المحتوى** | `CategoryCard.tsx`, قسم في `page.tsx`, صفحة `category/[slug]/page.tsx` | ✅ جديد |
+| **تصفح المحتوى** | `CategoryCard.tsx`, قسم في `page.tsx`, صفحة `category/[slug]/page.tsx` | ✅ |
 | التحميل MP3 | زر تحميل + `api/download/route.ts` | ✅ |
 | دعم Firebase + Mock | `db.ts` (تبديل تلقائي) | ✅ |
 | دعم Arabic RTL | `layout.tsx` + Google Font Cairo | ✅ |
 | وضع الظلام/النهار | `ThemeToggle.tsx`, `AccessibilityWidget.tsx` | ✅ |
 | إمكانية الوصول (كبار السن) | `AccessibilityWidget.tsx` (حجم الخط، تباين عالي) | ✅ |
-| بيانات منظمة (Schema.org) | `layout.tsx` JSON-LD + `page.tsx` (category schema) | ✅ |
-| تحسين محركات البحث (SEO) | `layout.tsx` meta tags, sitemap, internal links | ✅ |
-| **صور المشاركة الديناميكية OG** | `lectures/[slug]/opengraph-image.tsx` (ImageResponse + خط Cairo) | ✅ جديد |
-| **Open Graph / Twitter Metadata** | `lectures/[slug]/page.tsx` (generateMetadata) | ✅ جديد |
-| **مشاركة واتساب + Web Share API** | `lectures/[slug]/client-page.tsx` (زر مشاركة مع fallback) | ✅ جديد |
-| **البيانات المنظمة (Structured Data)** | `lectures/[slug]/page.tsx` (VideoObject/AudioObject JSON-LD) | ✅ جديد |
-| **التواصل عبر البريد الإلكتروني** | قسم في `page.tsx` (footer), حقل في `GeneralSettings` | ✅ جديد |
-| **أيقونات التواصل فقط في الموبايل** | `page.tsx` (إخفاء النصوص في أزرار السوشيال ميديا) | ✅ جديد |
-| **هيدر مبسط للموبايل** | `page.tsx` (إخفاء النص الفرعي للمسجد + النصوص في الأزرار) | ✅ جديد |
+| بيانات منظمة (Schema.org) | `lectures/[slug]/page.tsx`, `l/[shortSlug]/page.tsx` (VideoObject/AudioObject JSON-LD) | ✅ |
+| تحسين محركات البحث (SEO) | `layout.tsx` meta tags, sitemap, canonical URLs, internal links | ✅ |
+| **صور المشاركة الديناميكية OG** | `lectures/[slug]/opengraph-image.tsx` (ImageResponse + خط Cairo) | ✅ |
+| **Open Graph / Twitter Metadata** | `lectures/[slug]/page.tsx`, `l/[shortSlug]/page.tsx` (generateMetadata) | ✅ |
+| **مشاركة واتساب + Web Share API** | `lectures/[slug]/client-page.tsx` (زر مشاركة واحد مع fallback) | ✅ |
+| زر مشاركة واحد 🔗 | `lectures/[slug]/client-page.tsx` (إزالة زر نسخ الرابط، دمج في زر واحد) | ✅ جديد |
+| **التواصل عبر البريد الإلكتروني** | قسم في `page.tsx` (footer), حقل في `GeneralSettings` | ✅ |
+| **أيقونات التواصل فقط في الموبايل** | `page.tsx` (إخفاء النصوص في أزرار السوشيال ميديا) | ✅ |
+| **هيدر مبسط للموبايل** | `page.tsx` (إخفاء النص الفرعي للمسجد + النصوص في الأزرار) | ✅ |
 
 ## الأنواع (Types)
 
 - `Category` — id, name, slug, **sortOrder (جديد)**, createdAt
 - `GeneralSettings` — mosqueName, logoUrl, description, contactPhone, **contactEmail (جديد)**, whatsappLink, facebookLink, youtubeChannel, liveStreamUrl, tiktokLink
 - `PrayerSettings`, `PrayerOffsets`, `PrayerTimesManual` — مواقيت الصلاة
-- `Lecture`, `Announcement`, `Admin`
+- `Lecture` — id, title, description, sheikh, youtubeUrl, thumbnailUrl, categoryIds, mp3Url, slug, **shortSlug (جديد)**, views, downloads, createdAt
+- `Announcement`, `Admin`
+
+## المسارات (Routes)
+
+| المسار | الملف | الوظيفة |
+|--------|-------|---------|
+| `/` | `page.tsx` | الصفحة الرئيسية |
+| `/admin` | `admin/page.tsx` | لوحة التحكم |
+| `/lectures/[slug]` | `lectures/[slug]/page.tsx` | صفحة المحاضرة (يعيد التوجيه إلى /l/ إذا كان الرابط قديماً) |
+| `/l/[shortSlug]` | **l/[shortSlug]/page.tsx (جديد)** | **الرابط المختصر للمحاضرة (الرابط الأساسي للمشاركة)** |
+| `/category/[slug]` | `category/[slug]/page.tsx` | صفحة التصنيف |
+| `/api/download` | `api/download/route.ts` | تحميل MP3 |
+| `/sitemap.xml` | `sitemap.ts` | خريطة الموقع |
 
 ## التعديلات الجراحية الأخيرة
 
-- **تحسين مشاركة المحاضرات**: صور OG ديناميكية (1200×630) + بطاقة معاينة احترافية + أزرار مشاركة.
-- **إصلاح خطأ حذف الإعلانات**: `db.ts` — إزالة التجاوز (fallback) إلى LocalStorage عند فشل Firebase في عمليات الكتابة (إضافة/تحديث/حذف). كان التجاوز يستخدم بيانات قديمة لا تتطابق مع معرفات Firebase مما يجعل الحذف بلا تأثير. الآن تنتشر الأخطاء إلى المتصل مباشرة.
-- **تحسين معالجة الأخطاء**: `admin/page.tsx` — إظهار رسالة خطأ للمستخدم عند فشل الحذف أو الإضافة. 
-
-- **إضافة تصفح المحتوى**: `CategoryCard.tsx` (مكون), قسم "تصفح المحتوى" في `page.tsx` (بعد مواقيت الصلاة), `category/[slug]/page.tsx` (صفحة تصنيف مستقلة)
-- **إضافة sortOrder إلى Category**: `types.ts`, `db.ts` (defaults + sorting), `admin/page.tsx` (حقل في إضافة/تعديل التصنيف + عرضه)
-- **تحديث Schema.org**: `layout.tsx` (إضافة WebSite + SearchAction), `page.tsx` (إضافة ItemList للتصنيفات ديناميكياً)
-- **إضافة contactEmail**: `types.ts`, `db.ts`, `admin/page.tsx`, `page.tsx`
-- **إخفاء نصوص السوشيال ميديا في الموبايل**: `page.tsx` (أزرار اليوتيوب، فيسبوك، واتساب، تيك توك)
-- **تبسيط الهيدر في الموبايل**: إخفاء "الموقع الرسمي" subtitle + نصوص الأزرار (البث المباشر، لوحة التحكم)
-- **إضافة قسم التواصل**: "كيف تتواصل معنا" قبل الفوتر مع بريد إلكتروني وهاتف
+- **نظام Short Links (جديد)**: إعادة تصميم كامل لنظام روابط المحاضرات. تمت إضافة حقل `shortSlug` إلى `Lecture` يتم إنشاؤه تلقائياً (ترجمة عربية→إنجليزية أو معرف عشوائي 6 أحرف). المسار الجديد `/l/[shortSlug]` يعرض المحاضرة مباشرة وهو الرابط الأساسي للمشاركة.
+- **إعادة توجيه الروابط القديمة**: `lectures/[slug]/page.tsx` — عند دخول رابط قديم (عربي أو ID)، يتم إعادة التوجيه 308 (permanent) إلى `/l/shortSlug`.
+- **تحسين زر المشاركة**: استبدال زري (نسخ الرابط + مشاركة واتساب) بزر واحد "🔗 مشاركة المحاضرة". يستخدم Web Share API المدعوم مع fallback إلى واتساب.
+- **تحديث رابط المشاركة**: نص المشاركة الآن يستخدم الرابط المختصر `/l/...` بدلاً من الرابط الطويل. نص المشاركة: 🎙 العنوان 👤 الشيخ 📖 منصة مسجد سيد المرسلين 🔗 الرابط.
+- **تحديث جميع الروابط الداخلية**: `LectureCard.tsx` و `sitemap.ts` وروابط المحاضرات المقترحة تستخدم `/l/` بدلاً من `/lectures/`.
+- **حقل Short Link في لوحة التحكم**: إضافة حقل "الرابط القصير Short Link" اختياري في إضافة/تعديل المحاضرة. إذا ترك فارغاً يتم إنشاؤه تلقائياً.
+- **تحديث Canonical URL**: جميع صفحات المحاضرات تستخدم `/l/shortSlug` كـ canonical URL و og:url.
+- **تحسين صور OG**: `generateMetadata` في `/l/[shortSlug]` و `/lectures/[slug]` تستخدم الرابط المختصر لـ og:url.
