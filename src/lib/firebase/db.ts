@@ -90,6 +90,7 @@ const defaultGeneralSettings: GeneralSettings = {
   logoUrl: "/logo.png",
   description: "الموقع الرسمي لمسجد سيد المرسلين. نسعى لتقديم الخدمات الدينية والثقافية، وإقامة شعائر الصلوات الخمس والجمعة، ونشر تعاليم الإسلام السمحة.",
   contactPhone: "+201000000000",
+  contactEmail: "",
   whatsappLink: "https://wa.me/33700000000", // placeholder or real link
   facebookLink: "https://facebook.com",
   youtubeChannel: "https://www.youtube.com/@OfficialSydAL-Mursalin",
@@ -115,12 +116,12 @@ const defaultPrayerSettings: PrayerSettings = {
 };
 
 export const defaultCategories: Category[] = [
-  { id: "cat-1", name: "خطب الجمعة", slug: "friday-sermons", createdAt: Date.now() },
-  { id: "cat-2", name: "التلاوات", slug: "recitations", createdAt: Date.now() },
-  { id: "cat-3", name: "الدروس", slug: "lessons", createdAt: Date.now() },
-  { id: "cat-4", name: "الثلاثيات الدعوية", slug: "three-minute-reminders", createdAt: Date.now() },
-  { id: "cat-5", name: "الرباعيات الدعوية", slug: "four-minute-reminders", createdAt: Date.now() },
-  { id: "cat-6", name: "التلاوات في الصلاة", slug: "prayer-recitations", createdAt: Date.now() }
+  { id: "cat-1", name: "خطب الجمعة", slug: "friday-sermons", sortOrder: 1, createdAt: Date.now() },
+  { id: "cat-2", name: "التلاوات", slug: "recitations", sortOrder: 2, createdAt: Date.now() },
+  { id: "cat-3", name: "الدروس", slug: "lessons", sortOrder: 3, createdAt: Date.now() },
+  { id: "cat-4", name: "الثلاثيات الدعوية", slug: "three-minute-reminders", sortOrder: 4, createdAt: Date.now() },
+  { id: "cat-5", name: "الرباعيات الدعوية", slug: "four-minute-reminders", sortOrder: 5, createdAt: Date.now() },
+  { id: "cat-6", name: "التلاوات في الصلاة", slug: "prayer-recitations", sortOrder: 6, createdAt: Date.now() }
 ];
 
 const defaultLectures: Lecture[] = [
@@ -614,11 +615,12 @@ export const getCategories = async (): Promise<Category[]> => {
   if (isFirebaseConfigured()) {
     try {
       const collRef = collection(db, 'categories');
-      const q = query(collRef, orderBy('createdAt', 'desc'));
+      const q = query(collRef, orderBy('sortOrder', 'asc'));
       const querySnap = await withDbTimeout(getDocs(q));
       const list: Category[] = [];
       querySnap.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() } as Category);
+        const data = doc.data();
+        list.push({ id: doc.id, sortOrder: data.sortOrder ?? 999, ...data } as Category);
       });
       return list;
     } catch (e) {
@@ -627,7 +629,7 @@ export const getCategories = async (): Promise<Category[]> => {
   }
   
   const all: Category[] = mockDb.get('categories', defaultCategories);
-  return all.sort((a, b) => b.createdAt - a.createdAt);
+  return all.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
 };
 
 export const addCategory = async (cat: Omit<Category, 'id'>): Promise<string> => {
@@ -635,14 +637,16 @@ export const addCategory = async (cat: Omit<Category, 'id'>): Promise<string> =>
   const completeCat: Category = {
     ...cat,
     id: newId,
-    slug: cat.slug || generateSlug(cat.name)
+    slug: cat.slug || generateSlug(cat.name),
+    sortOrder: cat.sortOrder ?? 999
   };
   
   if (isFirebaseConfigured()) {
     try {
       const docRef = await withDbTimeout(addDoc(collection(db, 'categories'), {
         ...cat,
-        slug: cat.slug || generateSlug(cat.name)
+        slug: cat.slug || generateSlug(cat.name),
+        sortOrder: cat.sortOrder ?? 999
       }));
       return docRef.id;
     } catch (e) {

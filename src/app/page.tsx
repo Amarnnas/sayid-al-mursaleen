@@ -12,6 +12,7 @@ import { GeneralSettings, PrayerSettings, Announcement, Lecture, Category } from
 import PrayerTimesCard from '../components/PrayerTimesCard';
 import AnnouncementCard from '../components/AnnouncementCard';
 import LectureCard from '../components/LectureCard';
+import CategoryCard from '../components/CategoryCard';
 import AccessibilityWidget from '../components/AccessibilityWidget';
 import ThemeToggle from '../components/ThemeToggle';
 import { 
@@ -25,7 +26,8 @@ import {
   FolderOpen,
   X,
   Inbox,
-  Loader2
+  Loader2,
+  Mail
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
@@ -258,6 +260,28 @@ function HomeContent() {
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-950 font-sans antialiased text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
       
+      {/* Category Schema.org JSON-LD */}
+      {categories.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "ItemList",
+              "name": "تصنيفات محتوى مسجد سيد المرسلين",
+              "description": "تصفح المحاضرات والخطب والتلاوات حسب التصنيف",
+              "url": "https://saed-al-mursaleen.web.app",
+              "itemListElement": categories.filter(cat => lectures.some(lec => lec.categoryIds?.includes(cat.id))).map((cat, index) => ({
+                "@type": "ListItem",
+                "position": index + 1,
+                "name": cat.name,
+                "url": `https://saed-al-mursaleen.web.app/category/${cat.slug}`
+              }))
+            })
+          }}
+        />
+      )}
+
       {/* 1. Header & Navigation Bar */}
       <header className="sticky top-0 z-40 w-full border-b border-zinc-200/50 bg-white/80 dark:border-zinc-900/50 dark:bg-zinc-950/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6">
@@ -275,10 +299,10 @@ function HomeContent() {
               </div>
             )}
             <div>
-              <h1 className="text-lg font-bold text-zinc-900 dark:text-white leading-tight">
+              <h1 className="text-sm sm:text-lg font-bold text-zinc-900 dark:text-white leading-tight">
                 {gen.mosqueName}
               </h1>
-              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">الموقع الرسمي</p>
+              <p className="hidden sm:block text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">الموقع الرسمي</p>
             </div>
           </div>
 
@@ -289,10 +313,10 @@ function HomeContent() {
                 href={gen.liveStreamUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md animate-pulse"
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-2 sm:px-3 py-1.5 rounded-full shadow-md animate-pulse"
               >
                 <Radio className="w-3.5 h-3.5" />
-                <span>البث المباشر</span>
+                <span className="hidden sm:inline">البث المباشر</span>
               </a>
             )}
 
@@ -300,10 +324,10 @@ function HomeContent() {
 
             <Link 
               href="/admin"
-              className="flex items-center gap-1.5 border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-300 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all"
+              className="flex items-center gap-1.5 border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-300 text-xs font-semibold px-2 sm:px-3 py-1.5 rounded-xl transition-all"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>لوحة التحكم</span>
+              <span className="hidden sm:inline">لوحة التحكم</span>
             </Link>
           </div>
         </div>
@@ -348,10 +372,10 @@ function HomeContent() {
                 href={gen.youtubeChannel} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-md transition-colors"
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3 sm:px-4 py-2.5 rounded-2xl shadow-md transition-colors"
               >
                 <YoutubeIcon className="w-4 h-4 fill-current" />
-                <span>قناة اليوتيوب</span>
+                <span className="hidden sm:inline">قناة اليوتيوب</span>
               </a>
             )}
 
@@ -360,10 +384,10 @@ function HomeContent() {
                 href={gen.facebookLink} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-md transition-colors"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 sm:px-4 py-2.5 rounded-2xl shadow-md transition-colors"
               >
                 <FacebookIcon className="w-4 h-4 fill-current" />
-                <span>الفيسبوك</span>
+                <span className="hidden sm:inline">الفيسبوك</span>
               </a>
             )}
 
@@ -372,10 +396,10 @@ function HomeContent() {
                 href={gen.whatsappLink} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-md transition-colors"
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 sm:px-4 py-2.5 rounded-2xl shadow-md transition-colors"
               >
                 <Phone className="w-4 h-4 fill-current" />
-                <span>مجموعة الواتساب</span>
+                <span className="hidden sm:inline">مجموعة الواتساب</span>
               </a>
             )}
 
@@ -384,10 +408,10 @@ function HomeContent() {
                 href={gen.tiktokLink} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-md transition-colors dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs px-3 sm:px-4 py-2.5 rounded-2xl shadow-md transition-colors dark:bg-zinc-800 dark:hover:bg-zinc-700"
               >
                 <TiktokIcon className="w-4 h-4 fill-current" />
-                <span>تيك توك</span>
+                <span className="hidden sm:inline">تيك توك</span>
               </a>
             )}
           </div>
@@ -401,6 +425,27 @@ function HomeContent() {
         <section className="w-full">
           <PrayerTimesCard settings={pray} />
         </section>
+
+        {/* Browse Categories Section */}
+        {categories.length > 0 && (
+          <section className="w-full animate-fade-in">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 mb-5">
+              <h3 className="text-lg font-extrabold text-zinc-950 dark:text-white flex items-center gap-2">
+                <span className="w-2 h-5 bg-emerald-600 dark:bg-emerald-500 rounded-full"></span>
+                تصفح المحتوى
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+              {categories.map((cat) => {
+                const count = lectures.filter(l => l.categoryIds?.includes(cat.id)).length;
+                if (count === 0) return null;
+                return (
+                  <CategoryCard key={cat.id} category={cat} lectureCount={count} />
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Announcements section */}
         {announcements.length > 0 && (
@@ -566,8 +611,38 @@ function HomeContent() {
 
       </main>
 
-      {/* 4. Footer Section */}
-      <footer className="mt-16 bg-white dark:bg-zinc-950 border-t border-zinc-200/50 dark:border-zinc-900/50">
+      {/* 4. Contact Section */}
+      {(gen.contactEmail || gen.contactPhone) && (
+        <section className="w-full bg-white dark:bg-zinc-950 border-t border-zinc-200/50 dark:border-zinc-900/50">
+          <div className="mx-auto max-w-6xl px-4 py-12 md:py-16 md:px-6 text-center">
+            <h3 className="text-xl md:text-2xl font-black text-zinc-900 dark:text-white mb-3">كيف تتواصل معنا؟</h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8 max-w-lg mx-auto">يمكنكم التواصل مع إدارة المسجد عبر الوسائل التالية لإرسال الاستفسارات والملاحظات والاقتراحات.</p>
+            <div className="flex flex-wrap justify-center gap-4 items-center">
+              {gen.contactEmail && (
+                <a
+                  href={`mailto:${gen.contactEmail}`}
+                  className="flex items-center gap-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-5 py-3.5 rounded-2xl shadow-md transition-all active:scale-95"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>راسلنا عبر البريد الإلكتروني</span>
+                </a>
+              )}
+              {gen.contactPhone && (
+                <a
+                  href={`tel:${gen.contactPhone}`}
+                  className="flex items-center gap-2.5 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-bold text-sm px-5 py-3.5 rounded-2xl transition-all active:scale-95"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>اتصل بنا عبر الهاتف</span>
+                </a>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 5. Footer Section */}
+      <footer className="bg-white dark:bg-zinc-950">
         <div className="mx-auto max-w-6xl px-4 py-8 md:px-6 text-center text-[10px] text-zinc-400 dark:text-zinc-500">
           <p>جميع الحقوق محفوظة لمسجد سيد المرسلين © {new Date().getFullYear()}</p>
         </div>

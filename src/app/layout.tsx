@@ -89,6 +89,19 @@ export default function RootLayout({
                   "name": "مسجد سيد المرسلين",
                   "url": "https://saed-al-mursaleen.web.app",
                   "logo": "https://saed-al-mursaleen.web.app/logo.png"
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": "https://saed-al-mursaleen.web.app/#website",
+                  "url": "https://saed-al-mursaleen.web.app",
+                  "name": "مسجد سيد المرسلين - الموقع الرسمي للخطب والمواعظ ومواقيت الصلاة",
+                  "description": "منصة مسجد سيد المرسلين الرسمية للخطب والمحاضرات ومواقيت الصلاة والدروس الإسلامية.",
+                  "inLanguage": "ar",
+                  "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": "https://saed-al-mursaleen.web.app/?search={search_term_string}",
+                    "query-input": "required name=search_term_string"
+                  }
                 }
               ]
             })

@@ -2,6 +2,7 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
+  sortOrder: number;
   createdAt: number; // millisecond timestamp
 }
 
@@ -34,6 +35,7 @@ export interface GeneralSettings {
   logoUrl: string;
   description: string;
   contactPhone: string;
+  contactEmail?: string;
   whatsappLink: string;
   facebookLink: string;
   youtubeChannel: string;

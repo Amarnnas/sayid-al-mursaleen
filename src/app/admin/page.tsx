@@ -131,7 +131,7 @@ export default function AdminDashboard() {
     mp3Url: '',
     categoryIds: [] as string[]
   });
-  const [newCategory, setNewCategory] = useState({ name: '', slug: '' });
+  const [newCategory, setNewCategory] = useState({ name: '', slug: '', sortOrder: 999 });
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminRole, setNewAdminRole] = useState<'super_admin' | 'admin'>('admin');
   const [newAdminPassword, setNewAdminPassword] = useState('123456');
@@ -141,6 +141,7 @@ export default function AdminDashboard() {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const [editingCategorySlug, setEditingCategorySlug] = useState('');
+  const [editingCategorySortOrder, setEditingCategorySortOrder] = useState(999);
   const [editingAdminEmail, setEditingAdminEmail] = useState<string | null>(null);
   const [editingAdminPassword, setEditingAdminPassword] = useState('');
 
@@ -820,10 +821,11 @@ export default function AdminDashboard() {
       await addCategory({
         name: newCategory.name.trim(),
         slug,
+        sortOrder: newCategory.sortOrder,
         createdAt: Date.now()
       });
       setSuccessMsg("تم إضافة التصنيف بنجاح!");
-      setNewCategory({ name: '', slug: '' });
+      setNewCategory({ name: '', slug: '', sortOrder: 999 });
       const updated = await getCategories();
       setCategories(updated);
     } catch (e: any) {
@@ -838,6 +840,7 @@ export default function AdminDashboard() {
     setEditingCategoryId(cat.id);
     setEditingCategoryName(cat.name);
     setEditingCategorySlug(cat.slug);
+    setEditingCategorySortOrder(cat.sortOrder ?? 999);
   };
 
   const handleSaveCategory = async (id: string) => {
@@ -850,7 +853,8 @@ export default function AdminDashboard() {
       const slug = editingCategorySlug.trim() || generateSlug(editingCategoryName.trim());
       await updateCategory(id, {
         name: editingCategoryName.trim(),
-        slug
+        slug,
+        sortOrder: editingCategorySortOrder
       });
       setSuccessMsg("تم تعديل التصنيف بنجاح!");
       setEditingCategoryId(null);
@@ -1215,6 +1219,17 @@ export default function AdminDashboard() {
                     type="text" 
                     value={general.contactPhone}
                     onChange={e => setGeneral({ ...general, contactPhone: e.target.value })}
+                    className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 dark:text-zinc-400">البريد الإلكتروني للتواصل</label>
+                  <input 
+                    type="email" 
+                    value={general.contactEmail || ''}
+                    onChange={e => setGeneral({ ...general, contactEmail: e.target.value })}
+                    placeholder="example@mosque.com"
                     className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
                   />
                 </div>
@@ -1832,7 +1847,7 @@ export default function AdminDashboard() {
             <form onSubmit={handleAddCategory} className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
               <h4 className="font-bold text-sm text-zinc-800 dark:text-zinc-200">إضافة تصنيف جديد</h4>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">اسم التصنيف</label>
                   <input 
@@ -1852,6 +1867,18 @@ export default function AdminDashboard() {
                     placeholder="مثال: friday-sermons"
                     value={newCategory.slug}
                     onChange={e => setNewCategory({ ...newCategory, slug: e.target.value })}
+                    className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">ترتيب العرض (Sort Order)</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    placeholder="1"
+                    value={newCategory.sortOrder || ''}
+                    onChange={e => setNewCategory({ ...newCategory, sortOrder: parseInt(e.target.value) || 999 })}
                     className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
                   />
                 </div>
@@ -1903,6 +1930,16 @@ export default function AdminDashboard() {
                               placeholder="الرابط اللطيف (Slug)"
                             />
                           </div>
+                          <div className="w-20">
+                            <input 
+                              type="number" 
+                              min="1"
+                              value={editingCategorySortOrder}
+                              onChange={e => setEditingCategorySortOrder(parseInt(e.target.value) || 999)}
+                              className="w-full rounded-xl border border-emerald-500 px-3 py-2 text-xs focus:outline-none dark:bg-zinc-950"
+                              placeholder="ترتيب"
+                            />
+                          </div>
                           <div className="flex gap-1">
                             <button
                               onClick={() => handleSaveCategory(cat.id)}
@@ -1925,7 +1962,7 @@ export default function AdminDashboard() {
                         <>
                           <div className="flex-1">
                             <h5 className="font-bold text-sm text-zinc-900 dark:text-white leading-snug">{cat.name}</h5>
-                            <span className="text-[10px] text-zinc-400 font-medium block mt-1">الرابط اللطيف (Slug): {cat.slug}</span>
+                            <span className="text-[10px] text-zinc-400 font-medium block mt-1">الرابط اللطيف (Slug): {cat.slug} · الترتيب: {cat.sortOrder ?? 999}</span>
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
