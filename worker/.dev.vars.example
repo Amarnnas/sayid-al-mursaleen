@@ -1,0 +1,20 @@
+# Example local development secrets for the Cloudflare Worker.
+# Copy this file to `.dev.vars` (gitignored) and fill real values.
+# NEVER commit the real `.dev.vars` file.
+#
+# Get keys from https://archive.org/account/s3.php
+
+IA_ACCESS_KEY=
+IA_SECRET_KEY=
+
+# Optional: require a shared token; clients then send header `x-upload-token`
+#UPLOAD_TOKEN=change-me
+
+# Optional: CORS origin allowlist of the frontend (comma separated)
+#ALLOWED_ORIGINS=http://localhost:3000
+
+# Optional: Internet Archive collection metadata
+#IA_COLLECTION=opensource_media
+
+# Optional: max upload size in MB (default 4096)
+#MAX_UPLOAD_MB=4096
