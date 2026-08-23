@@ -9,10 +9,15 @@ import {
   incrementLectureViews,
   incrementLectureDownloads,
   getYouTubeId,
+  getYouTubeThumbnail,
   getGeneralSettings,
   getPrayerSettings
 } from '../../../lib/firebase/db'
 import { Lecture, Category, GeneralSettings, PrayerSettings } from '../../../lib/types'
+import {
+  ARCHIVE_AUDIO_EXTENSIONS,
+  getFileExtension
+} from '../../../lib/archiveUpload'
 import {
   ArrowRight,
   User,
@@ -39,6 +44,11 @@ type Props = {
   slug: string
 }
 
+type MediaSource = 'archive' | 'youtube' | 'none'
+
+const isAudioArchiveUrl = (url: string): boolean =>
+  ARCHIVE_AUDIO_EXTENSIONS.includes(getFileExtension((url || '').split('?')[0]))
+
 export default function LectureDetailClient({
   initialLecture,
   initialGeneralSettings,
@@ -58,8 +68,31 @@ export default function LectureDetailClient({
   const [downloading, setDownloading] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  // Per-lecture playback override after an archive failure ('youtube' | 'none').
+  const [sourceOverride, setSourceOverride] = useState<{ id: string; mode: 'youtube' | 'none' } | null>(null)
 
   const initialLoadDone = useRef(false)
+
+  const handleArchiveMediaError = () => {
+    if (!lecture) return
+    if (getYouTubeId(lecture.youtubeUrl)) {
+      // Primary archive source failed -> transparent fallback to YouTube.
+      setSourceOverride({ id: lecture.id, mode: 'youtube' })
+    } else {
+      // No fallback available; show a clear error state without looping.
+      setSourceOverride({ id: lecture.id, mode: 'none' })
+    }
+  }
+
+  // Derived media source: archive is primary, YouTube is the fallback, and an
+  // override (set on playback error) wins for the current lecture only.
+  const mediaSource: MediaSource = sourceOverride && sourceOverride.id === lecture?.id
+    ? sourceOverride.mode
+    : lecture?.archiveUrl
+      ? 'archive'
+      : lecture?.youtubeUrl
+        ? 'youtube'
+        : 'none'
 
   useEffect(() => {
     if (initialLecture && !initialLoadDone.current) {
@@ -149,16 +182,23 @@ export default function LectureDetailClient({
     loadPageData()
   }, [slug, initialLecture, initialAllLectures])
 
-  const handleDownloadMp3 = async () => {
-    if (!lecture || !lecture.mp3Url) return
+  const handleDownloadMedia = async () => {
+    if (!lecture) return
+    const source = lecture.archiveUrl || lecture.mp3Url
+    if (!source) return
     setDownloading(true)
     setToast(null)
     try {
       await incrementLectureDownloads(lecture.id)
       setLecture(prev => prev ? { ...prev, downloads: (prev.downloads || 0) + 1 } : null)
 
-      const safeFilename = `${lecture.title.replace(/[\\/:*?"<>|]/g, '')}.mp3`
-      const downloadUrl = `/api/download?url=${encodeURIComponent(lecture.mp3Url)}&filename=${encodeURIComponent(safeFilename)}`
+      const cleanBase = lecture.title.replace(/[\\/:*?"<>|]/g, '')
+      const path = source.split('?')[0]
+      const dotIndex = path.lastIndexOf('.')
+      const ext = dotIndex > -1 ? path.slice(dotIndex).toLowerCase() : ''
+      const safeExt = /^\.[a-z0-9]{2,5}$/.test(ext) ? ext : '.mp3'
+      const safeFilename = `${cleanBase}${safeExt}`
+      const downloadUrl = `/api/download?url=${encodeURIComponent(source)}&filename=${encodeURIComponent(safeFilename)}`
 
       const link = document.createElement('a')
       link.href = downloadUrl
@@ -312,9 +352,38 @@ export default function LectureDetailClient({
           /* Left Side: Video Player & Details */
           <div className="flex-1 flex flex-col gap-6">
 
-            {/* Cinema Player Container */}
+            {/* Cinema Player Container — Archive primary with YouTube fallback */}
             <div className="relative aspect-video w-full overflow-hidden rounded-3xl bg-black shadow-xl border border-zinc-200/20 dark:border-zinc-800/40">
-              {videoId ? (
+              {mediaSource === 'archive' && lecture.archiveUrl ? (
+                isAudioArchiveUrl(lecture.archiveUrl) ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-6">
+                    <Music className="w-12 h-12 text-emerald-500" />
+                    <audio
+                      key={`${lecture.id}-archive-audio`}
+                      src={lecture.archiveUrl}
+                      controls
+                      autoPlay
+                      preload="metadata"
+                      onError={handleArchiveMediaError}
+                      className="w-full max-w-md"
+                    >
+                      متصفحك لا يدعم تشغيل الصوت.
+                    </audio>
+                  </div>
+                ) : (
+                  <video
+                    key={`${lecture.id}-archive-video`}
+                    src={lecture.archiveUrl}
+                    controls
+                    autoPlay
+                    preload="metadata"
+                    onError={handleArchiveMediaError}
+                    className="absolute inset-0 h-full w-full"
+                  >
+                    متصفحك لا يدعم تشغيل الفيديو.
+                  </video>
+                )
+              ) : videoId ? (
                 <iframe
                   src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
                   title={lecture.title}
@@ -324,9 +393,11 @@ export default function LectureDetailClient({
                   className="absolute inset-0 h-full w-full"
                 ></iframe>
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-zinc-500">
-                  <AlertCircle className="w-12 h-12 mb-2" />
-                  <span>رابط الفيديو غير صالح.</span>
+                <div className="absolute inset-0 flex h-full w-full flex-col items-center justify-center gap-2 text-zinc-400">
+                  <AlertCircle className="w-12 h-12 mb-1" />
+                  {mediaSource === 'none' && (lecture.archiveUrl || lecture.youtubeUrl)
+                    ? 'تعذر تشغيل الوسائط من المصادر المتاحة حاليًا. حاول تحديث الصفحة.'
+                    : 'لا توجد وسائط متاحة لهذه المحاضرة.'}
                 </div>
               )}
             </div>
@@ -380,9 +451,9 @@ export default function LectureDetailClient({
 
               {/* Action Buttons Row */}
               <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/60 mt-2 flex flex-col sm:flex-row gap-3">
-                {lecture.mp3Url && (
+                {(lecture.archiveUrl || lecture.mp3Url) && (
                   <button
-                    onClick={handleDownloadMp3}
+                    onClick={handleDownloadMedia}
                     disabled={downloading}
                     className="flex-1 flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg hover:shadow-emerald-600/20 active:scale-99 transition-all cursor-pointer text-base md:text-lg"
                   >
@@ -391,7 +462,11 @@ export default function LectureDetailClient({
                     ) : (
                       <Music className="w-5.5 h-5.5" />
                     )}
-                    <span>تحميل الصوت MP3</span>
+                    <span>
+                      {lecture.archiveUrl && !isAudioArchiveUrl(lecture.archiveUrl)
+                        ? 'تحميل الفيديو'
+                        : 'تحميل الصوت MP3'}
+                    </span>
                     <span className="text-xs font-normal opacity-85">({lecture.downloads || 0} تحميل)</span>
                   </button>
                 )}
@@ -425,7 +500,6 @@ export default function LectureDetailClient({
           {suggestedLectures.length > 0 ? (
             <div className="flex flex-col gap-4">
               {suggestedLectures.map((lec) => {
-                const suggVideoId = getYouTubeId(lec.youtubeUrl)
                 return (
                   <Link
                     href={`/l/${lec.shortSlug || lec.slug || lec.id}`}
@@ -434,11 +508,17 @@ export default function LectureDetailClient({
                   >
                     {/* Thumbnail */}
                     <div className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-xl bg-zinc-800">
-                      <img
-                        src={lec.thumbnailUrl || `https://img.youtube.com/vi/${suggVideoId}/hqdefault.jpg`}
-                        alt={lec.title}
-                        className="h-full w-full object-cover transform group-hover:scale-105 transition-transform duration-300"
-                      />
+                      {lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl) ? (
+                        <img
+                          src={lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl)}
+                          alt={lec.title}
+                          className="h-full w-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-emerald-950/60">
+                          <Music className="w-6 h-6 text-emerald-500" />
+                        </div>
+                      )}
                     </div>
                     {/* Details */}
                     <div className="flex flex-col justify-between py-0.5">
