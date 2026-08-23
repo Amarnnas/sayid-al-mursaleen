@@ -12,6 +12,7 @@ export interface Lecture {
   description: string;
   sheikh: string;
   youtubeUrl: string;
+  archiveUrl?: string; // Internet Archive direct URL (primary media source)
   thumbnailUrl?: string;
   categoryIds?: string[]; // IDs of associated categories
   mp3Url?: string; // external direct audio link

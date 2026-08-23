@@ -18,6 +18,7 @@ saed_web/
 │   ├── components/
 │   │   ├── AccessibilityWidget.tsx    # Floating accessibility (font size, high contrast, light/dark/system)
 │   │   ├── AnnouncementCard.tsx       # Announcement display card
+│   │   ├── CategoryCard.tsx           # Category display card
 │   │   ├── LectureCard.tsx            # Lecture card with thumbnail, download, navigation
 │   │   ├── PrayerTimesCard.tsx        # Dynamic prayer times with countdown
 │   │   ├── ThemeToggle.tsx            # Light/Dark/System toggle in header
@@ -26,8 +27,13 @@ saed_web/
 │       ├── firebase/
 │       │   ├── config.ts       # Firebase config & auth init
 │       │   └── db.ts           # DB service (Firestore + LocalStorage mock fallback)
+│       ├── archiveUpload.ts    # Client uploader: Browser → Cloudflare Worker → Internet Archive
 │       ├── prayerTimes.ts      # Adhan prayer time calculation utilities
 │       └── types.ts            # TypeScript interfaces
+├── worker/                     # Cloudflare Worker (IAS3 streaming upload proxy)
+│   ├── src/index.ts            # PUT /upload/{item?}/{file} → s3.us.archive.org (streaming)
+│   ├── wrangler.jsonc          # Wrangler deployment config
+│   └── test/                   # vitest unit tests + opt-in live IAS3 selftest
 ├── public/
 │   ├── fonts/
 │   │   ├── Cairo-Regular.ttf
@@ -60,6 +66,8 @@ saed_web/
 | التصنيفات | تصفية وفرز في `page.tsx`, إدارة في `admin/page.tsx` | ✅ |
 | **تصفح المحتوى** | `CategoryCard.tsx`, قسم في `page.tsx`, صفحة `category/[slug]/page.tsx` | ✅ |
 | التحميل MP3 | زر تحميل + `api/download/route.ts` | ✅ |
+| **رفع مباشر إلى Internet Archive** | `worker/` (Cloudflare Worker IAS3) + `archiveUpload.ts` + نموذج `admin` | ✅ جديد |
+| **مشغل ثنائي مع Fallback** | `lectures/[slug]/client-page.tsx` — Archive أولاً ثم YouTube عند الفشل | ✅ جديد |
 | دعم Firebase + Mock | `db.ts` (تبديل تلقائي) | ✅ |
 | دعم Arabic RTL | `layout.tsx` + Google Font Cairo | ✅ |
 | وضع الظلام/النهار | `ThemeToggle.tsx`, `AccessibilityWidget.tsx` | ✅ |
@@ -79,7 +87,7 @@ saed_web/
 - `Category` — id, name, slug, **sortOrder (جديد)**, createdAt
 - `GeneralSettings` — mosqueName, logoUrl, description, contactPhone, **contactEmail (جديد)**, whatsappLink, facebookLink, youtubeChannel, liveStreamUrl, tiktokLink
 - `PrayerSettings`, `PrayerOffsets`, `PrayerTimesManual` — مواقيت الصلاة
-- `Lecture` — id, title, description, sheikh, youtubeUrl, thumbnailUrl, categoryIds, mp3Url, slug, **shortSlug (جديد)**, views, downloads, createdAt
+- `Lecture` — id, title, description, sheikh, youtubeUrl (احتياطي), **archiveUrl (جديد - المصدر الأساسي من archive.org)**, thumbnailUrl, categoryIds, mp3Url, slug, **shortSlug**, views, downloads, createdAt
 - `Announcement`, `Admin`
 
 ## المسارات (Routes)

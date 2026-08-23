@@ -1,0 +1,17 @@
+{
+  "name": "saed-ia-upload-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker proxy streaming uploads to Internet Archive IAS3",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250810.0",
+    "typescript": "^5",
+    "vitest": "^3"
+  }
+}

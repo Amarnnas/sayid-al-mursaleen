@@ -29,6 +29,12 @@ import {
   generateSlug
 } from '../../lib/firebase/db';
 import { GeneralSettings, PrayerSettings, Announcement, Lecture, Admin, Category } from '../../lib/types';
+import {
+  getArchiveUploadEndpoint,
+  isAllowedMediaFileName,
+  formatBytes,
+  uploadFileToArchive
+} from '../../lib/archiveUpload';
 import { auth } from '../../lib/firebase/config';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import Toast from '../../components/Toast';
@@ -58,7 +64,8 @@ import {
   Tags,
   Pencil,
   X,
-  Key
+  Key,
+  Music
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -122,12 +129,13 @@ export default function AdminDashboard() {
   
   // --- Form Insertion States ---
   const [newAnn, setNewAnn] = useState({ title: '', content: '', imageUrl: '' });
-  const [newLec, setNewLec] = useState({ 
-    title: '', 
-    sheikh: 'خطيب المسجد', 
-    youtubeUrl: '', 
-    description: '', 
-    thumbnailUrl: '', 
+  const [newLec, setNewLec] = useState({
+    title: '',
+    sheikh: 'خطيب المسجد',
+    youtubeUrl: '',
+    archiveUrl: '',
+    description: '',
+    thumbnailUrl: '',
     mp3Url: '',
     slug: '',
     shortSlug: '',
@@ -140,6 +148,12 @@ export default function AdminDashboard() {
 
   // --- Editing states ---
   const [editingLectureId, setEditingLectureId] = useState<string | null>(null);
+
+  // --- Archive (IAS3) file upload states ---
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const uploadAbortRef = useRef<AbortController | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const [editingCategorySlug, setEditingCategorySlug] = useState('');
@@ -689,29 +703,94 @@ export default function AdminDashboard() {
     }
   };
 
+  // --- Archive file selection & upload (IAS3 via Worker) ---
+  const handleSelectArchiveFile = (file: File | null) => {
+    if (!file) return;
+    if (!isAllowedMediaFileName(file.name)) {
+      setErrorMsg("نوع الملف غير مدعوم. المسموح: mp3, m4a, wav, ogg, opus, aac, flac, mp4, webm, mov, mkv.");
+      return;
+    }
+    setUploadFile(file);
+    setUploadProgress(0);
+    // Picking a new file replaces any previously uploaded archive source.
+    setNewLec(prev => ({ ...prev, archiveUrl: '' }));
+  };
+
+  const handleRemoveArchiveFile = () => {
+    if (uploadAbortRef.current) {
+      uploadAbortRef.current.abort();
+    }
+    setUploadFile(null);
+    setUploading(false);
+    setUploadProgress(0);
+    setNewLec(prev => ({ ...prev, archiveUrl: '' }));
+  };
+
+  const handleStartArchiveUpload = async () => {
+    if (!uploadFile || uploading) return;
+    if (!getArchiveUploadEndpoint()) {
+      setErrorMsg("خدمة رفع الأرشيف غير مهيأة. أضف NEXT_PUBLIC_IA_UPLOAD_URL في إعدادات النشر.");
+      return;
+    }
+    setUploading(true);
+    setUploadProgress(0);
+    setErrorMsg('');
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    try {
+      const result = await uploadFileToArchive(uploadFile, {
+        title: newLec.title.trim() || uploadFile.name,
+        signal: controller.signal,
+        onProgress: setUploadProgress
+      });
+      setNewLec(prev => ({ ...prev, archiveUrl: result.url }));
+      setSuccessMsg("تم رفع الملف بنجاح إلى أرشيف الإنترنت!");
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setErrorMsg("تم إلغاء عملية الرفع.");
+      } else if (e instanceof Error) {
+        console.error(e);
+        setErrorMsg(e.message || "فشل رفع الملف. حاول مجددًا.");
+      } else {
+        setErrorMsg("فشل رفع الملف. حاول مجددًا.");
+      }
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      uploadAbortRef.current = null;
+    }
+  };
+
   // Add or Edit lecture
   const handleAddLecture = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newLec.youtubeUrl) {
-      setErrorMsg("يرجى إدخال رابط اليوتيوب.");
+
+    const hasArchive = !!newLec.archiveUrl.trim();
+    const hasYouTube = !!newLec.youtubeUrl;
+
+    if (!hasArchive && !hasYouTube) {
+      setErrorMsg("أضف ملف المحاضرة (صوت/فيديو) أو رابط يوتيوب احتياطي على الأقل.");
       return;
     }
-    
-    const videoId = getYouTubeId(newLec.youtubeUrl);
-    if (!videoId) {
-      setErrorMsg("رابط اليوتيوب المدخل غير صالح.");
-      return;
+
+    let videoId = '';
+    if (hasYouTube) {
+      videoId = getYouTubeId(newLec.youtubeUrl);
+      if (!videoId) {
+        setErrorMsg("رابط اليوتيوب المدخل غير صالح.");
+        return;
+      }
     }
-    
+
     setLoading(true);
     try {
       let finalTitle = newLec.title;
       let finalDescription = newLec.description;
-      let finalThumbnail = newLec.thumbnailUrl || getYouTubeThumbnail(newLec.youtubeUrl);
+      let finalThumbnail = newLec.thumbnailUrl || (hasYouTube ? getYouTubeThumbnail(newLec.youtubeUrl) : '');
       let finalSheikh = newLec.sheikh;
-      
-      // If fields are empty, attempt to auto-fetch
-      if (!finalTitle.trim() || !finalDescription.trim() || !newLec.thumbnailUrl.trim()) {
+
+      // If fields are empty, attempt to auto-fetch from YouTube metadata
+      if (hasYouTube && (!finalTitle.trim() || !finalDescription.trim() || !newLec.thumbnailUrl.trim())) {
         const fetched = await fetchYouTubeMeta(newLec.youtubeUrl);
         if (fetched) {
           if (!finalTitle.trim()) finalTitle = fetched.title;
@@ -720,19 +799,20 @@ export default function AdminDashboard() {
           if (finalSheikh === 'خطيب المسجد') finalSheikh = fetched.sheikh;
         }
       }
-      
+
       // Fallback checking if still empty after fetch attempt
       if (!finalTitle.trim()) {
-        finalTitle = `خطبة/محاضرة يوتيوب #${videoId}`;
+        finalTitle = hasYouTube ? `خطبة/محاضرة يوتيوب #${videoId}` : 'محاضرة صوتية/مرئية مسجلة';
       }
       if (!finalDescription.trim()) {
         finalDescription = "لم يتم إضافة تفاصيل لهذه المحاضرة.";
       }
-      
+
       const lectureData = {
         title: finalTitle,
         sheikh: finalSheikh,
-        youtubeUrl: newLec.youtubeUrl,
+        youtubeUrl: hasYouTube ? newLec.youtubeUrl : "",
+        archiveUrl: newLec.archiveUrl.trim() || "",
         description: finalDescription,
         thumbnailUrl: finalThumbnail,
         mp3Url: newLec.mp3Url.trim() || "",
@@ -740,7 +820,7 @@ export default function AdminDashboard() {
         shortSlug: newLec.shortSlug.trim() || undefined,
         categoryIds: newLec.categoryIds
       };
-      
+
       if (editingLectureId) {
         await updateLecture(editingLectureId, lectureData);
         setSuccessMsg("تم تعديل المحاضرة بنجاح!");
@@ -752,19 +832,22 @@ export default function AdminDashboard() {
         });
         setSuccessMsg("تمت إضافة المحاضرة/الخطبة بنجاح!");
       }
-      
-      setNewLec({ 
-        title: '', 
-        sheikh: 'خطيب المسجد', 
-        youtubeUrl: '', 
-        description: '', 
-        thumbnailUrl: '', 
+
+      setNewLec({
+        title: '',
+        sheikh: 'خطيب المسجد',
+        youtubeUrl: '',
+        archiveUrl: '',
+        description: '',
+        thumbnailUrl: '',
         mp3Url: '',
         slug: '',
         shortSlug: '',
         categoryIds: []
       });
-      
+      setUploadFile(null);
+      setUploadProgress(0);
+
       // Reload lectures list
       const updated = await getLectures();
       setLectures(updated);
@@ -781,7 +864,8 @@ export default function AdminDashboard() {
     setNewLec({
       title: lec.title,
       sheikh: lec.sheikh,
-      youtubeUrl: lec.youtubeUrl,
+      youtubeUrl: lec.youtubeUrl || '',
+      archiveUrl: lec.archiveUrl || '',
       description: lec.description,
       thumbnailUrl: lec.thumbnailUrl || '',
       mp3Url: lec.mp3Url || '',
@@ -789,6 +873,7 @@ export default function AdminDashboard() {
       shortSlug: lec.shortSlug || '',
       categoryIds: lec.categoryIds || []
     });
+    setUploadFile(null);
     setActiveTab('lectures');
   };
 
@@ -798,6 +883,7 @@ export default function AdminDashboard() {
       title: '',
       sheikh: 'خطيب المسجد',
       youtubeUrl: '',
+      archiveUrl: '',
       description: '',
       thumbnailUrl: '',
       mp3Url: '',
@@ -805,6 +891,8 @@ export default function AdminDashboard() {
       shortSlug: '',
       categoryIds: []
     });
+    setUploadFile(null);
+    setUploadProgress(0);
   };
 
   // Delete lecture
@@ -1623,11 +1711,107 @@ export default function AdminDashboard() {
               </h4>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Archive Upload — primary media source */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">
+                    ملف المحاضرة الصوتي/المرئي <span className="text-emerald-600">(المصدر الأساسي - يُرفع إلى أرشيف الإنترنت)</span>
+                  </label>
+                  {!uploadFile ? (
+                    <label
+                      htmlFor="archive-file-input"
+                      className={`flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-6 text-center transition-all ${
+                        uploading
+                          ? 'border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 opacity-60'
+                          : 'border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50/40 cursor-pointer dark:border-zinc-700 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/20'
+                      }`}
+                    >
+                      <input
+                        id="archive-file-input"
+                        type="file"
+                        accept="audio/*,video/*,.mp3,.m4a,.wav,.ogg,.oga,.opus,.aac,.flac,.mp4,.webm,.mov,.mkv"
+                        disabled={uploading}
+                        onChange={(e) => {
+                          handleSelectArchiveFile(e.target.files?.[0] || null);
+                          e.target.value = '';
+                        }}
+                      />
+                      <span className="w-10 h-10 rounded-2xl bg-emerald-600/10 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 flex items-center justify-center">
+                        <Music className="w-5 h-5" />
+                      </span>
+                      <div>
+                        <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">اضغط لاختيار ملف فيديو أو صوت</p>
+                        <p className="text-[9px] text-zinc-400 mt-0.5">سيتم رفعه مباشرة إلى أرشيف الإنترنت (Internet Archive)</p>
+                      </div>
+                    </label>
+                  ) : (
+                    <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950 flex flex-col gap-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${newLec.archiveUrl ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-zinc-200 text-zinc-500 dark:bg-zinc-800'}`}>
+                            {newLec.archiveUrl ? <CheckCircle2 className="w-4 h-4" /> : <Music className="w-4 h-4" />}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200 truncate" dir="ltr">{uploadFile.name}</p>
+                            <p className="text-[9px] text-zinc-400">
+                              {formatBytes(uploadFile.size)}
+                              {newLec.archiveUrl && ' • تم الرفع بنجاح ✓'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {!newLec.archiveUrl && !uploading && (
+                            <button
+                              type="button"
+                              onClick={handleStartArchiveUpload}
+                              className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl transition-all"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>رفع الآن</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleRemoveArchiveFile}
+                            title={uploading ? 'إلغاء الرفع وإزالة الملف' : 'إزالة الملف'}
+                            className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {uploading && (
+                        <div className="flex flex-col gap-1">
+                          <div className="h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-emerald-600 transition-all duration-200"
+                              style={{ width: `${uploadProgress}%` }}
+                            ></div>
+                          </div>
+                          <div className="flex items-center justify-between text-[9px] text-zinc-400 font-medium">
+                            <span>جاري رفع الملف... {uploadProgress}%</span>
+                            <button
+                              type="button"
+                              onClick={() => uploadAbortRef.current?.abort()}
+                              className="text-red-500 hover:underline"
+                            >
+                              إلغاء
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <span className="text-[9px] text-zinc-400 mt-1 block">
+                    الصوت: mp3, m4a, wav, ogg, opus, aac, flac — الفيديو: mp4, webm, mov, mkv
+                  </span>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">رابط الفيديو من اليوتيوب</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 dark:text-zinc-400">رابط الفيديو من اليوتيوب <span className="text-zinc-400 font-normal">(احتياطي - اختياري)</span></label>
                   <div className="flex gap-2">
-                    <input 
-                      type="url" 
+                    <input
+                      type="url"
                       placeholder="https://youtu.be/..."
                       value={newLec.youtubeUrl}
                       onChange={e => setNewLec({ ...newLec, youtubeUrl: e.target.value })}
@@ -1637,7 +1821,6 @@ export default function AdminDashboard() {
                         }
                       }}
                       className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs focus:border-emerald-600 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                      required
                     />
                     <button
                       type="button"
@@ -1652,7 +1835,7 @@ export default function AdminDashboard() {
                       )}
                     </button>
                   </div>
-                  <span className="text-[9px] text-zinc-400 mt-1 block">يدعم روابط shorts/ و youtu.be/ و watch?v=</span>
+                  <span className="text-[9px] text-zinc-400 mt-1 block">اختياري: يُستخدم تلقائيًا إذا فشل تشغيل ملف الأرشيف. يدعم shorts/ و youtu.be/ و watch?v=</span>
                 </div>
 
                 <div>
@@ -1843,11 +2026,17 @@ export default function AdminDashboard() {
                   {lectures.map((lec) => (
                     <div key={lec.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
                       <div className="flex items-center gap-4">
-                        <img 
-                          src={lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl)} 
-                          alt={lec.title} 
-                          className="w-16 md:w-20 aspect-video object-cover rounded-lg bg-zinc-800 shrink-0" 
-                        />
+                        {lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl) ? (
+                          <img
+                            src={lec.thumbnailUrl || getYouTubeThumbnail(lec.youtubeUrl)}
+                            alt={lec.title}
+                            className="w-16 md:w-20 aspect-video object-cover rounded-lg bg-zinc-800 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-16 md:w-20 aspect-video rounded-lg bg-emerald-600/10 dark:bg-emerald-950/40 flex items-center justify-center shrink-0">
+                            <Music className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                          </div>
+                        )}
                         <div>
                           <h5 className="font-bold text-xs md:text-sm text-zinc-900 dark:text-white leading-snug line-clamp-1">{lec.title}</h5>
                           <div className="flex flex-wrap items-center gap-2 mt-1">

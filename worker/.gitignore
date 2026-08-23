@@ -1,0 +1,9 @@
+# Worker local state
+.wrangler/
+.dev.vars
+
+# Dependencies
+node_modules/
+
+# Misc
+*.log

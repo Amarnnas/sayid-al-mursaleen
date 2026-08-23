@@ -1,0 +1,11 @@
+// Wrangler configuration for the Internet Archive upload proxy Worker.
+// Deploy: `npx wrangler deploy`   |   Local dev: `npx wrangler dev`
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "saed-ia-upload-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "observability": {
+    "enabled": true
+  }
+}

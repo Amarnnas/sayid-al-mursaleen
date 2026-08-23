@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { Lecture } from '../lib/types';
-import { Play, User, Calendar, Download, Loader2 } from 'lucide-react';
-import { getYouTubeId, incrementLectureDownloads } from '../lib/firebase/db';
+import { Play, User, Calendar, Download, Loader2, Music } from 'lucide-react';
+import { getYouTubeThumbnail, incrementLectureDownloads } from '../lib/firebase/db';
 import Link from 'next/link';
 import Toast from './Toast';
 
@@ -25,14 +25,14 @@ export default function LectureCard({ lecture, categoryNames }: LectureCardProps
     });
   };
 
-  const videoId = getYouTubeId(lecture.youtubeUrl);
   const targetHref = `/l/${lecture.shortSlug || lecture.slug || lecture.id}`;
+  const downloadSource = lecture.archiveUrl || lecture.mp3Url || '';
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!lecture.mp3Url) return;
+    if (!downloadSource) return;
 
     setDownloading(true);
     setToast(null);
@@ -42,8 +42,12 @@ export default function LectureCard({ lecture, categoryNames }: LectureCardProps
       await incrementLectureDownloads(lecture.id);
 
       // 2. Format proxy download URL
-      const safeFilename = `${lecture.title.replace(/[\\/:*?"<>|]/g, '')}.mp3`;
-      const downloadUrl = `/api/download?url=${encodeURIComponent(lecture.mp3Url)}&filename=${encodeURIComponent(safeFilename)}`;
+      const path = downloadSource.split('?')[0];
+      const dotIndex = path.lastIndexOf('.');
+      const ext = dotIndex > -1 ? path.slice(dotIndex).toLowerCase() : '';
+      const safeExt = /^\.[a-z0-9]{2,5}$/.test(ext) ? ext : '.mp3';
+      const safeFilename = `${lecture.title.replace(/[\\/:*?"<>|]/g, '')}${safeExt}`;
+      const downloadUrl = `/api/download?url=${encodeURIComponent(downloadSource)}&filename=${encodeURIComponent(safeFilename)}`;
 
       // 3. Create a temporary anchor element and trigger download
       const link = document.createElement('a');
@@ -73,14 +77,20 @@ export default function LectureCard({ lecture, categoryNames }: LectureCardProps
 
       {/* Main Link for lecture page navigation (excluding bottom action) */}
       <Link href={targetHref} className="flex-1 flex flex-col">
-        {/* YouTube Thumbnail Wrapper */}
+        {/* Thumbnail Wrapper */}
         <div className="relative aspect-video w-full overflow-hidden bg-black">
-          <img 
-            src={lecture.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`} 
-            alt={lecture.title} 
-            className="h-full w-full object-cover transform group-hover:scale-103 transition-transform duration-300"
-            loading="lazy"
-          />
+          {lecture.thumbnailUrl || getYouTubeThumbnail(lecture.youtubeUrl) ? (
+            <img
+              src={lecture.thumbnailUrl || getYouTubeThumbnail(lecture.youtubeUrl)}
+              alt={lecture.title}
+              className="h-full w-full object-cover transform group-hover:scale-103 transition-transform duration-300"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-emerald-950/60">
+              <Music className="w-10 h-10 text-emerald-500" />
+            </div>
+          )}
           
           {/* Overlay Darkener */}
           <div className="absolute inset-0 bg-black/10 group-hover:bg-black/35 transition-colors duration-300"></div>
@@ -129,15 +139,15 @@ export default function LectureCard({ lecture, categoryNames }: LectureCardProps
         </div>
       </Link>
 
-      {/* Direct MP3 Download Button */}
-      {lecture.mp3Url && (
+      {/* Direct Media Download Button */}
+      {downloadSource && (
         <div className="px-5 pb-5 pt-1 border-t border-zinc-50 dark:border-zinc-800/20 shrink-0">
           <button
             onClick={handleDownload}
             disabled={downloading}
             className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-650 active:scale-97 text-white font-extrabold text-xs py-3.5 rounded-xl transition-all duration-200 shadow-sm hover:shadow-emerald-600/10 cursor-pointer disabled:cursor-not-allowed"
-            title="تحميل الصوت MP3 مباشرة على جهازك"
-            aria-label={`تحميل الصوت MP3 للمحاضرة: ${lecture.title}`}
+            title="تحميل الملف مباشرة على جهازك"
+            aria-label={`تحميل ملف المحاضرة: ${lecture.title}`}
           >
             {downloading ? (
               <>
@@ -147,7 +157,7 @@ export default function LectureCard({ lecture, categoryNames }: LectureCardProps
             ) : (
               <>
                 <Download className="w-4 h-4" />
-                <span>تحميل الصوت MP3</span>
+                <span>تحميل الملف</span>
               </>
             )}
           </button>

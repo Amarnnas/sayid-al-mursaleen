@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The Cloudflare Worker has its own quality gates (tsc --strict + vitest).
+    "worker/**",
   ]),
 ]);
 
