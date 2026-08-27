@@ -9,11 +9,40 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://saed-al-mursaleen.web.app"),
   title: "مسجد سيد المرسلين - الموقع الرسمي للخطب والمواعظ ومواقيت الصلاة",
-  description: "منصة مسجد سيد المرسلين الرسمية للخطب والمحاضرات ومواقيت الصلاة والدروس الإسلامية.",
-  keywords: ["مسجد سيد المرسلين", "سيد المرسلين", "مواقيت الصلاة", "خطب الجمعة", "دروس إسلامية", "أحاديث شريفة", "تلاوات قرآنية"],
+  description: "منصة مسجد سيد المرسلين الرسمية للخطب والمحاضرات ومواقيت الصلاة والدروس الإسلامية. استمع إلى الخطب، المحاضرات، التلاوات والأنواع الإسلامية في مكان واحد.",
+  applicationName: "مسجد سيد المرسلين",
+  authors: [{ name: "مسجد سيد المرسلين" }],
+  creator: "مسجد سيد المرسلين",
+  publisher: "مسجد سيد المرسلين",
+  keywords: [
+    "مسجد سيد المرسلين",
+    "سيد المرسلين",
+    "مواقيت الصلاة",
+    "خطب الجمعة",
+    "دروس إسلامية",
+    "أحاديث شريفة",
+    "تلاوات قرآنية",
+    "محاضرات إسلامية",
+    "مواعظ إسلامية",
+  ],
   alternates: {
-    canonical: "https://saed-al-mursaleen.web.app",
+    canonical: "/",
+    languages: {
+      ar: "/",
+    },
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
   icons: {
     icon: "/logo.png",
@@ -22,17 +51,21 @@ export const metadata: Metadata = {
   openGraph: {
     title: "مسجد سيد المرسلين - الموقع الرسمي للخطب والمواعظ ومواقيت الصلاة",
     description: "منصة مسجد سيد المرسلين الرسمية للخطب والمحاضرات ومواقيت الصلاة والدروس الإسلامية.",
-    images: [{ url: "https://saed-al-mursaleen.web.app/logo.png" }],
+    url: "https://saed-al-mursaleen.web.app",
+    images: [{ url: "https://saed-al-mursaleen.web.app/logo.png", width: 1200, height: 630, alt: "مسجد سيد المرسلين" }],
     type: "website",
     locale: "ar_AR",
     siteName: "مسجد سيد المرسلين",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "مسجد سيد المرسلين - الموقع الرسمي",
     description: "منصة مسجد سيد المرسلين الرسمية للخطب والمحاضرات ومواقيت الصلاة والدروس الإسلامية.",
     images: ["https://saed-al-mursaleen.web.app/logo.png"],
-  }
+  },
+  other: {
+    "theme-color": "#0f766e",
+  },
 };
 
 export default function RootLayout({
