@@ -60,7 +60,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
 
             <div style={{ width: 280, height: 280, borderRadius: 24, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', border: '3px solid rgba(5,150,105,0.15)' }}>
               <img
-                src={thumbnail || 'https://saed-al-mursaleen.web.app/logo.png'}
+                src={thumbnail || 'https://sayid-al-mursaleen.vercel.app/logo.png'}
                 alt=""
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />

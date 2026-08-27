@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { getCategories, getLectures } from '../lib/firebase/db';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://saed-al-mursaleen.web.app';
+  const baseUrl = 'https://sayid-al-mursaleen.vercel.app';
 
   const [lectures, categories] = await Promise.all([
     getLectures().catch(() => []),

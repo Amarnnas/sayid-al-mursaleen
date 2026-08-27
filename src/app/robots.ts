@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: '/',
     },
-    sitemap: 'https://saed-al-mursaleen.web.app/sitemap.xml',
-    host: 'https://saed-al-mursaleen.web.app',
+    sitemap: 'https://sayid-al-mursaleen.vercel.app/sitemap.xml',
+    host: 'https://sayid-al-mursaleen.vercel.app',
   };
 }
