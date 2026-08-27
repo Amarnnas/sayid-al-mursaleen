@@ -4,13 +4,13 @@ export async function GET() {
 ## معلومات الموقع
 - الاسم: مسجد سيد المرسلين
 - الوصف: المنصة الرسمية للخطب، المحاضرات، المواعظ ومواقيت الصلاة.
-- الموقع: https://saed-al-mursaleen.web.app
+- الموقع: https://sayid-al-mursaleen.vercel.app
 - اللغة: العربية
 
 ## محتوى مهم
-- الرئيسية: https://saed-al-mursaleen.web.app/
-- محاضرات: https://saed-al-mursaleen.web.app/
-- الخطب: https://saed-al-mursaleen.web.app/
+- الرئيسية: https://sayid-al-mursaleen.vercel.app/
+- محاضرات: https://sayid-al-mursaleen.vercel.app/
+- الخطب: https://sayid-al-mursaleen.vercel.app/
 
 ## الأهداف
 يقدم الموقع محتوى إسلامي موثوقًا يشمل الخطب، المحاضرات، التلاوات، المواقيت، والمواد الشرعية المنظمة في تصنيفات واضحة.

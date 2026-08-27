@@ -23,15 +23,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${lecture.title} - ${lecture.sheikh}`,
     description: lecture.description?.slice(0, 160) || `محاضرة للشيخ ${lecture.sheikh} من مسجد سيد المرسلين`,
     alternates: {
-      canonical: `https://saed-al-mursaleen.web.app/l/${canonicalSlug}`,
+      canonical: `https://sayid-al-mursaleen.vercel.app/l/${canonicalSlug}`,
     },
+
     openGraph: {
       title: lecture.title,
       description: lecture.description?.slice(0, 200) || `محاضرة للشيخ ${lecture.sheikh}`,
       type: 'article',
       locale: 'ar_AR',
       siteName: 'مسجد سيد المرسلين',
-      url: `https://saed-al-mursaleen.web.app/l/${canonicalSlug}`,
+      url: `https://sayid-al-mursaleen.vercel.app/l/${canonicalSlug}`,
       images: thumbnail ? [{ url: thumbnail, width: 1200, height: 630, alt: lecture.title }] : [],
     },
     twitter: {

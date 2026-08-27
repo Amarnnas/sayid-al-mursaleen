@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://saed-al-mursaleen.web.app/sitemap.xml
+Sitemap: https://sayid-al-mursaleen.vercel.app/sitemap.xml

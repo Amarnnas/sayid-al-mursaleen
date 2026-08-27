@@ -270,12 +270,12 @@ function HomeContent() {
               "@type": "ItemList",
               "name": "تصنيفات محتوى مسجد سيد المرسلين",
               "description": "تصفح المحاضرات والخطب والتلاوات حسب التصنيف",
-              "url": "https://saed-al-mursaleen.web.app",
+              "url": "https://sayid-al-mursaleen.vercel.app",
               "itemListElement": categories.filter(cat => lectures.some(lec => lec.categoryIds?.includes(cat.id))).map((cat, index) => ({
                 "@type": "ListItem",
                 "position": index + 1,
                 "name": cat.name,
-                "url": `https://saed-al-mursaleen.web.app/category/${cat.slug}`
+                "url": `https://sayid-al-mursaleen.vercel.app/category/${cat.slug}`
               }))
             })
           }}
